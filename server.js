@@ -24,6 +24,18 @@ function broadcastUserList() {
     });
 }
 
+function broadcastSystemMessage(text, excludeWs = null) {
+    clients.forEach(client => {
+        if (client.ws !== excludeWs && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({
+                type: 'system',
+                text: text,
+                timestamp: Date.now()
+            }));
+        }
+    });
+}
+
 function sendToUser(toName, data) {
     const recipient = findClientByName(toName);
     if (recipient && recipient.ws.readyState === WebSocket.OPEN) {
@@ -37,6 +49,9 @@ server.on('connection', (ws) => {
     clients.push(client);
 
     ws.send(JSON.stringify({ type: 'init', nick: guestName }));
+    
+    // Оповещаем всех о новом пользователе
+    broadcastSystemMessage(`${guestName} присоединился к чату`);
     broadcastUserList();
 
     ws.on('message', (raw) => {
@@ -115,15 +130,8 @@ server.on('connection', (ws) => {
                 
                 ws.send(JSON.stringify({ type: 'nick_changed', nick: newName }));
                 
-                clients.forEach(c => {
-                    if (c.ws !== ws && c.ws.readyState === WebSocket.OPEN) {
-                        c.ws.send(JSON.stringify({
-                            type: 'system',
-                            text: `${oldName} → ${newName}`
-                        }));
-                    }
-                });
-                
+                // Оповещаем всех о смене ника
+                broadcastSystemMessage(`${oldName} → ${newName}`);
                 broadcastUserList();
             }
         } catch(e) {
@@ -137,15 +145,8 @@ server.on('connection', (ws) => {
             const leftName = clients[index].name;
             clients.splice(index, 1);
             
-            clients.forEach(c => {
-                if (c.ws.readyState === WebSocket.OPEN) {
-                    c.ws.send(JSON.stringify({
-                        type: 'system',
-                        text: `${leftName} покинул чат`
-                    }));
-                }
-            });
-            
+            // Оповещаем всех о выходе
+            broadcastSystemMessage(`${leftName} покинул чат`);
             broadcastUserList();
         }
     });

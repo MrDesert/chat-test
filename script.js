@@ -111,13 +111,14 @@ function addPrivateMessage(from, to, text, timestamp) {
 
 function addSystemMessage(text) {
     const chatDiv = document.getElementById('chat');
+    // Системные сообщения показываем только в общем чате
     if (currentChatWith !== null) return;
+    
     const msgDiv = document.createElement('div');
     msgDiv.className = 'system';
     msgDiv.innerText = text;
     chatDiv.appendChild(msgDiv);
     chatDiv.scrollTop = chatDiv.scrollHeight;
-    setTimeout(() => msgDiv.remove(), 4000);
 }
 
 function addErrorMessage(text) {
@@ -134,7 +135,8 @@ function updateUserListUI() {
     const usersList = document.getElementById('userList');
     if (!usersList || !window.userList) return;
     
-    const users = window.userList.filter(u => u !== currentNick);
+    // Показываем ВСЕХ пользователей, включая себя
+    const users = window.userList;
     
     if (users.length === 0) {
         usersList.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">Никого нет</div>';
@@ -145,9 +147,21 @@ function updateUserListUI() {
     document.getElementById('onlineCount').innerText = `${users.length} ${users.length === 1 ? 'человек' : 'человек'}`;
     
     usersList.innerHTML = users.map(name => {
+        const isSelf = (name === currentNick);
         const unread = unreadCount[name] || 0;
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
         const isActive = (currentChatWith === name);
+        
+        // Для себя — показываем без кнопки отправки
+        if (isSelf) {
+            return `
+                <div class="user-item ${isActive ? 'current' : ''}">
+                    <span class="status"></span>
+                    <span class="name">${escapeHtml(name)} (вы)</span>
+                </div>
+            `;
+        }
+        
         return `
             <div class="user-item ${isActive ? 'current' : ''}">
                 <span class="status"></span>
