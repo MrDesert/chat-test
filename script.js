@@ -155,36 +155,42 @@ function connect() {
     ws = new WebSocket(WS_URL);
     ws.onopen = () => console.log("Соединено");
     ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'init') {
-                currentNick = data.nick;
-                document.getElementById('nickInfo').innerText = currentNick;
-            } 
-            else if (data.type === 'message') {
-                const isOwn = (data.nick === currentNick);
-                const msgId = msgCounter++;
-                addMessage(data.nick, data.text, isOwn, data.timestamp, msgId);
-            }
-            else if (data.type === 'system') {
-                addSystemMessage(data.text);
-            }
-            else if (data.type === 'error') {
-                addErrorMessage(data.text);
-            }
-            else if (data.type === 'nick_changed') {
-                currentNick = data.nick;
-                document.getElementById('nickInfo').innerText = currentNick;
-                addSystemMessage(`Вы теперь ${currentNick}`);
-            }
-            else if (data.type === 'user_list') {
-                updateUserList(data.users);
-            }
-        } catch(e) {
-            console.error(e);
+    try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'init') {
+            currentNick = data.nick;
+            document.getElementById('nickInfo').innerText = currentNick;
+        } 
+        else if (data.type === 'message') {
+            const isOwn = (data.nick === currentNick);
+            const msgId = msgCounter++;
+            addMessage(data.nick, data.text, isOwn, data.timestamp, msgId);
         }
-    };
+        // ← НОВЫЙ БЛОК: обработка картинок
+        else if (data.type === 'image') {
+            const isOwn = (data.nick === currentNick);
+            const msgId = msgCounter++;
+            addImageMessage(data.nick, data.image, data.filename, isOwn, data.timestamp, msgId);
+        }
+        else if (data.type === 'system') {
+            addSystemMessage(data.text);
+        }
+        else if (data.type === 'error') {
+            addErrorMessage(data.text);
+        }
+        else if (data.type === 'nick_changed') {
+            currentNick = data.nick;
+            document.getElementById('nickInfo').innerText = currentNick;
+            addSystemMessage(`Вы теперь ${currentNick}`);
+        }
+        else if (data.type === 'user_list') {
+            updateUserList(data.users);
+        }
+    } catch(e) {
+        console.error(e);
+    }
+};
     ws.onclose = () => {
         console.log("Отключено, переподключение через 3с");
         setTimeout(connect, 3000);
