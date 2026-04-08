@@ -2,9 +2,10 @@ const WS_URL = "wss://chat-test-gb86.onrender.com";
 
 let ws = null;
 let currentNick = "";
-let currentChatWith = null; // с кем сейчас открыт чат
-let privateMessages = {};    // { "Вася": [{from, text, timestamp, isOwn}] }
-let unreadCount = {};         // { "Вася": 3 }
+let currentChatWith = null; // null = общий чат, иначе ник собеседника
+let publicMessages = [];
+let privateMessages = {};
+let unreadCount = {};
 let msgCounter = 0;
 
 function formatTimestamp(timestamp) {
@@ -21,6 +22,7 @@ function formatTimestamp(timestamp) {
 }
 
 function escapeHtml(str) {
+    if (!str) return '';
     return str.replace(/[&<>]/g, function(m) {
         if (m === '&') return '&amp;';
         if (m === '<') return '&lt;';
@@ -29,34 +31,35 @@ function escapeHtml(str) {
     });
 }
 
-function addPrivateMessage(from, to, text, timestamp, isOwn) {
-    const other = isOwn ? to : from;
-    if (!privateMessages[other]) privateMessages[other] = [];
-    
-    privateMessages[other].push({
-        from, to, text, timestamp, isOwn, id: msgCounter++
-    });
-    
-    // Если чат с этим человеком открыт — показываем сразу
-    if (currentChatWith === other) {
-        renderCurrentChat();
-    } else {
-        // Иначе увеличиваем счётчик непрочитанных
-        if (!unreadCount[other]) unreadCount[other] = 0;
-        unreadCount[other]++;
-        updateUserListUI();
-    }
-}
-
 function renderCurrentChat() {
     const chatDiv = document.getElementById('chat');
-    if (!currentChatWith) {
-        chatDiv.innerHTML = '<div class="placeholder">👈 Нажмите на ✉️ у пользователя, чтобы начать диалог</div>';
-        document.getElementById('currentChatTitle').innerText = '💬 Выберите чат';
+    
+    if (currentChatWith === null) {
+        // Общий чат
+        document.getElementById('currentChatTitle').innerHTML = '💬 Общий чат';
         document.getElementById('closeChatBtn').style.display = 'none';
+        
+        if (publicMessages.length === 0) {
+            chatDiv.innerHTML = '<div class="placeholder">💬 Напишите первое сообщение в общий чат</div>';
+            return;
+        }
+        
+        chatDiv.innerHTML = publicMessages.map(msg => {
+            const isOwn = (msg.nick === currentNick);
+            return `
+                <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
+                    <div class="message ${isOwn ? 'own' : 'other'}">
+                        <strong>${escapeHtml(msg.nick)}</strong>: ${escapeHtml(msg.text)}
+                    </div>
+                    <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+                </div>
+            `;
+        }).join('');
+        chatDiv.scrollTop = chatDiv.scrollHeight;
         return;
     }
     
+    // Личный чат
     document.getElementById('currentChatTitle').innerHTML = `💬 Чат с ${escapeHtml(currentChatWith)}`;
     document.getElementById('closeChatBtn').style.display = 'inline-block';
     
@@ -67,27 +70,69 @@ function renderCurrentChat() {
     }
     
     chatDiv.innerHTML = messages.map(msg => {
-        const isOwn = msg.isOwn;
-        const sender = isOwn ? 'Вы' : msg.from;
+        const sender = msg.isOwn ? 'Вы' : msg.from;
         return `
-            <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
-                <div class="message ${isOwn ? 'own' : 'other'}">
+            <div class="message-wrapper ${msg.isOwn ? 'own' : 'other'}">
+                <div class="message ${msg.isOwn ? 'own' : 'other'}">
                     <strong>${escapeHtml(sender)}</strong>: ${escapeHtml(msg.text)}
                 </div>
                 <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
             </div>
         `;
     }).join('');
-    
     chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function addPublicMessage(nick, text, timestamp) {
+    publicMessages.push({ nick, text, timestamp, id: msgCounter++ });
+    if (currentChatWith === null) {
+        renderCurrentChat();
+    }
+}
+
+function addPrivateMessage(from, to, text, timestamp) {
+    const other = (from === currentNick) ? to : from;
+    if (!privateMessages[other]) privateMessages[other] = [];
+    
+    privateMessages[other].push({
+        from, to, text, timestamp,
+        isOwn: (from === currentNick),
+        id: msgCounter++
+    });
+    
+    if (currentChatWith === other) {
+        renderCurrentChat();
+    } else {
+        if (!unreadCount[other]) unreadCount[other] = 0;
+        unreadCount[other]++;
+        updateUserListUI();
+    }
+}
+
+function addSystemMessage(text) {
+    const chatDiv = document.getElementById('chat');
+    if (currentChatWith !== null) return;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'system';
+    msgDiv.innerText = text;
+    chatDiv.appendChild(msgDiv);
+    chatDiv.scrollTop = chatDiv.scrollHeight;
+    setTimeout(() => msgDiv.remove(), 4000);
+}
+
+function addErrorMessage(text) {
+    const chatDiv = document.getElementById('chat');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'error';
+    msgDiv.innerText = '⚠️ ' + text;
+    chatDiv.appendChild(msgDiv);
+    chatDiv.scrollTop = chatDiv.scrollHeight;
+    setTimeout(() => msgDiv.remove(), 4000);
 }
 
 function updateUserListUI() {
     const usersList = document.getElementById('userList');
-    if (!usersList) return;
-    
-    // Получаем список пользователей от сервера (хранится в глобальной переменной)
-    if (!window.userList) return;
+    if (!usersList || !window.userList) return;
     
     const users = window.userList.filter(u => u !== currentNick);
     
@@ -102,8 +147,9 @@ function updateUserListUI() {
     usersList.innerHTML = users.map(name => {
         const unread = unreadCount[name] || 0;
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
+        const isActive = (currentChatWith === name);
         return `
-            <div class="user-item ${name === currentChatWith ? 'current' : ''}">
+            <div class="user-item ${isActive ? 'current' : ''}">
                 <span class="status"></span>
                 <span class="name">${escapeHtml(name)}</span>
                 <button class="msg-btn" data-user="${escapeHtml(name)}">✉️ ${unreadBadge}</button>
@@ -111,7 +157,6 @@ function updateUserListUI() {
         `;
     }).join('');
     
-    // Вешаем обработчики на кнопки
     document.querySelectorAll('.msg-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -122,8 +167,11 @@ function updateUserListUI() {
 }
 
 function openChatWith(userName) {
+    if (userName === currentNick) {
+        addErrorMessage("Нельзя отправить сообщение самому себе");
+        return;
+    }
     currentChatWith = userName;
-    // Сбрасываем счётчик непрочитанных для этого пользователя
     if (unreadCount[userName]) {
         delete unreadCount[userName];
         updateUserListUI();
@@ -137,52 +185,22 @@ function closeCurrentChat() {
     updateUserListUI();
 }
 
-function addSystemMessage(text) {
-    const chatDiv = document.getElementById('chat');
-    if (currentChatWith) return; // системные только в общем виде, но у нас нет общего чата
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'system';
-    msgDiv.innerText = text;
-    chatDiv.appendChild(msgDiv);
-    chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
-function addErrorMessage(text) {
-    const chatDiv = document.getElementById('chat');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'error';
-    msgDiv.innerText = '⚠️ ' + text;
-    chatDiv.appendChild(msgDiv);
-    chatDiv.scrollTop = chatDiv.scrollHeight;
-    setTimeout(() => msgDiv.remove(), 3000);
-}
-
-function sendPrivateMessage(to, text) {
+function sendMessage() {
+    const text = document.getElementById('message').value.trim();
+    if (!text) return;
+    
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         addErrorMessage("Нет соединения с сервером");
-        return false;
-    }
-    ws.send(JSON.stringify({
-        type: 'private',
-        to: to,
-        text: text
-    }));
-    return true;
-}
-
-function sendMessage() {
-    let text = document.getElementById('message').value.trim();
-    if (!text) return;
-    if (!currentChatWith) {
-        addErrorMessage("Сначала выберите чат (нажмите ✉️ у пользователя)");
         return;
     }
-    if (sendPrivateMessage(currentChatWith, text)) {
-        // Добавляем сообщение в локальный список
-        addPrivateMessage(currentNick, currentChatWith, text, Date.now(), true);
-        document.getElementById('message').value = '';
-        renderCurrentChat();
+    
+    if (currentChatWith === null) {
+        ws.send(JSON.stringify({ type: 'public', text: text }));
+    } else {
+        ws.send(JSON.stringify({ type: 'private', to: currentChatWith, text: text }));
     }
+    
+    document.getElementById('message').value = '';
 }
 
 function changeNick() {
@@ -205,21 +223,23 @@ function connect() {
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+            
             if (data.type === 'init') {
                 currentNick = data.nick;
                 document.getElementById('nickInfo').innerText = currentNick;
             }
+            else if (data.type === 'public') {
+                addPublicMessage(data.nick, data.text, data.timestamp);
+            }
             else if (data.type === 'private') {
-                const isOwn = (data.from === currentNick);
-                addPrivateMessage(data.from, data.to, data.text, data.timestamp, isOwn);
-                if (currentChatWith === (isOwn ? data.to : data.from)) {
-                    renderCurrentChat();
-                }
-                updateUserListUI();
+                addPrivateMessage(data.from, data.to, data.text, data.timestamp);
             }
             else if (data.type === 'user_list') {
                 window.userList = data.users;
                 updateUserListUI();
+            }
+            else if (data.type === 'system') {
+                addSystemMessage(data.text);
             }
             else if (data.type === 'error') {
                 addErrorMessage(data.text);
@@ -227,13 +247,7 @@ function connect() {
             else if (data.type === 'nick_changed') {
                 currentNick = data.nick;
                 document.getElementById('nickInfo').innerText = currentNick;
-                // Обновляем все сообщения, где был старый ник — сложно, проще очистить историю
-                privateMessages = {};
-                unreadCount = {};
-                currentChatWith = null;
-                renderCurrentChat();
-                updateUserListUI();
-                addErrorMessage("Ник изменён. История чатов очищена.");
+                addSystemMessage(`Теперь вы ${currentNick}`);
             }
         } catch(e) {
             console.error(e);
@@ -244,7 +258,6 @@ function connect() {
     };
 }
 
-// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('send').onclick = sendMessage;
     document.getElementById('changeNickBtn').onclick = changeNick;
@@ -283,32 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Картинки
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (!file.type.startsWith('image/')) {
-                addErrorMessage("Можно отправлять только картинки");
-                fileInput.value = '';
-                return;
-            }
-            if (file.size > 2 * 1024 * 1024) {
-                addErrorMessage("Картинка не больше 2 МБ");
-                fileInput.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                // TODO: отправка картинок в ЛС (пока не реализовано, чтобы не усложнять)
-                addErrorMessage("Отправка картинок в ЛС пока в разработке");
-                fileInput.value = '';
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-    
     // Модальное окно для картинок
     const modal = document.getElementById('imageModal');
     const modalImg = document.getElementById('modalImage');
@@ -320,7 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         modal.onclick = () => { modal.style.display = 'none'; };
-        document.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+        const closeBtn = document.querySelector('.modal-close');
+        if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
     }
     
     connect();

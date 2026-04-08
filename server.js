@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: process.env.PPORT || 8080 });
+const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
 
 let clients = [];
 let nextId = 1;
@@ -24,7 +24,7 @@ function broadcastUserList() {
     });
 }
 
-function sendToUser(toName, data, excludeWs = null) {
+function sendToUser(toName, data) {
     const recipient = findClientByName(toName);
     if (recipient && recipient.ws.readyState === WebSocket.OPEN) {
         recipient.ws.send(JSON.stringify(data));
@@ -37,8 +37,6 @@ server.on('connection', (ws) => {
     clients.push(client);
 
     ws.send(JSON.stringify({ type: 'init', nick: guestName }));
-
-    // Оповещаем всех об обновлении списка
     broadcastUserList();
 
     ws.on('message', (raw) => {
@@ -47,8 +45,24 @@ server.on('connection', (ws) => {
             const sender = findClientByWs(ws);
             if (!sender) return;
 
-            // Личное сообщение
-            if (data.type === 'private') {
+            // === ОБЩИЙ ЧАТ ===
+            if (data.type === 'public') {
+                const message = {
+                    type: 'public',
+                    nick: sender.name,
+                    text: data.text,
+                    timestamp: Date.now()
+                };
+                // Рассылаем ВСЕМ (включая отправителя)
+                clients.forEach(c => {
+                    if (c.ws.readyState === WebSocket.OPEN) {
+                        c.ws.send(JSON.stringify(message));
+                    }
+                });
+            }
+            
+            // === ЛИЧНОЕ СООБЩЕНИЕ ===
+            else if (data.type === 'private') {
                 const recipientName = data.to;
                 const recipient = findClientByName(recipientName);
                 
@@ -71,11 +85,11 @@ server.on('connection', (ws) => {
                 // Отправляем получателю
                 sendToUser(recipientName, message);
                 
-                // Отправляем отправителю (для отображения в его чате)
+                // Отправляем отправителю
                 ws.send(JSON.stringify(message));
             }
             
-            // Смена ника
+            // === СМЕНА НИКА ===
             else if (data.type === 'nick') {
                 const newName = data.nick.trim();
                 
@@ -100,6 +114,16 @@ server.on('connection', (ws) => {
                 sender.name = newName;
                 
                 ws.send(JSON.stringify({ type: 'nick_changed', nick: newName }));
+                
+                clients.forEach(c => {
+                    if (c.ws !== ws && c.ws.readyState === WebSocket.OPEN) {
+                        c.ws.send(JSON.stringify({
+                            type: 'system',
+                            text: `${oldName} → ${newName}`
+                        }));
+                    }
+                });
+                
                 broadcastUserList();
             }
         } catch(e) {
@@ -110,7 +134,18 @@ server.on('connection', (ws) => {
     ws.on('close', () => {
         const index = clients.findIndex(c => c.ws === ws);
         if (index !== -1) {
+            const leftName = clients[index].name;
             clients.splice(index, 1);
+            
+            clients.forEach(c => {
+                if (c.ws.readyState === WebSocket.OPEN) {
+                    c.ws.send(JSON.stringify({
+                        type: 'system',
+                        text: `${leftName} покинул чат`
+                    }));
+                }
+            });
+            
             broadcastUserList();
         }
     });
