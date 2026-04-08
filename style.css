@@ -10,17 +10,16 @@ body {
     background: #f5f5f5;
 }
 
-/* Основная область чата */
 .chat-main {
     flex: 3;
     display: flex;
     flex-direction: column;
     height: 100vh;
+    min-width: 0;
 }
 
-/* Боковая панель с онлайн-пользователями */
 .sidebar {
-    width: 250px;
+    width: 280px;
     background: white;
     border-left: 1px solid #ddd;
     display: flex;
@@ -50,10 +49,10 @@ body {
 }
 
 .user-item {
-    padding: 8px 16px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     border-bottom: 1px solid #eee;
     font-size: 14px;
 }
@@ -64,17 +63,46 @@ body {
     background: #4caf50;
     border-radius: 50%;
     display: inline-block;
+    flex-shrink: 0;
 }
 
 .user-item .name {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-weight: normal;
 }
 
 .user-item.current {
     background: #e8f0fe;
+}
+
+.user-item.current .name {
     font-weight: 500;
+}
+
+.msg-btn {
+    background: #e0e0e0;
+    border: none;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.msg-btn:hover {
+    background: #0066cc;
+    color: white;
+}
+
+.unread-badge {
+    background: #ff4444;
+    color: white;
+    font-size: 10px;
+    border-radius: 10px;
+    padding: 2px 6px;
+    margin-left: 6px;
 }
 
 #chat {
@@ -84,6 +112,14 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
+}
+
+.placeholder {
+    text-align: center;
+    color: #999;
+    padding: 40px;
+    font-size: 14px;
 }
 
 .message-wrapper {
@@ -199,6 +235,24 @@ button:hover {
     gap: 8px;
 }
 
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: bold;
+}
+
+.close-chat {
+    background: #ccc;
+    color: #333;
+    padding: 4px 8px;
+    font-size: 14px;
+}
+
+.close-chat:hover {
+    background: #999;
+}
+
 .nick-control {
     display: flex;
     gap: 8px;
@@ -222,24 +276,6 @@ button:hover {
     width: 120px;
 }
 
-.hint {
-    font-size: 11px;
-    color: #888;
-    padding: 4px 12px;
-}
-
-@media (max-width: 600px) {
-    .sidebar {
-        width: 180px;
-    }
-    .nick-control {
-        flex-wrap: wrap;
-    }
-    #nickInput {
-        width: 80px;
-    }
-}
-/* Панель со смайликами */
 .emoji-picker-container {
     position: relative;
 }
@@ -249,10 +285,6 @@ button:hover {
     font-size: 20px;
     padding: 8px 12px;
     border-radius: 20px;
-}
-
-.emoji-btn:hover {
-    background: #ccc;
 }
 
 .emoji-picker {
@@ -285,7 +317,6 @@ button:hover {
     cursor: pointer;
     padding: 4px;
     border-radius: 8px;
-    transition: transform 0.1s;
 }
 
 .emoji:hover {
@@ -299,16 +330,8 @@ button:hover {
     padding: 8px 12px;
     border-radius: 20px;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
 }
 
-.file-btn:hover {
-    background: #ccc;
-}
-
-/* Стиль для картинок в чате */
 .message img {
     max-width: 200px;
     max-height: 200px;
@@ -317,11 +340,6 @@ button:hover {
     cursor: pointer;
 }
 
-.image-message {
-    margin-top: 4px;
-}
-
-/* Модальное окно для увеличения картинки */
 .modal {
     display: none;
     position: fixed;
@@ -353,9 +371,44 @@ button:hover {
     font-size: 40px;
     font-weight: bold;
     cursor: pointer;
-    z-index: 10000;
 }
 
-.modal-close:hover {
-    color: #bbb;
+@media (max-width: 768px) {
+    .sidebar {
+        width: 240px;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        border-left: none;
+        border-top: 1px solid #ddd;
+        order: 2;
+    }
+    .user-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+    .user-item {
+        width: auto;
+        background: #f0f0f0;
+        border-radius: 20px;
+        border-bottom: none;
+        padding: 6px 12px;
+    }
+    .msg-btn {
+        font-size: 12px;
+        padding: 2px 6px;
+    }
+    .sidebar-header {
+        padding: 8px 12px;
+    }
 }
