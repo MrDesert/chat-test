@@ -201,4 +201,38 @@ document.addEventListener('DOMContentLoaded', () => {
     
     connect();
     startTimestampUpdater();
+
+    // Смайлики
+    const emojiBtn = document.getElementById('emojiBtn');
+    const emojiPicker = document.getElementById('emojiPicker');
+    const messageInput = document.getElementById('message');
+
+    if (emojiBtn) {
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            emojiPicker.classList.toggle('hidden');
+        });
+    
+        // Закрыть панель при клике вне её
+        document.addEventListener('click', (e) => {
+            if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
+                emojiPicker.classList.add('hidden');
+            }
+        });
+    
+        // Вставка смайлика в поле ввода
+        document.querySelectorAll('.emoji').forEach(emoji => {
+            emoji.addEventListener('click', () => {
+                const currentText = messageInput.value;
+                const cursorPos = messageInput.selectionStart;
+                const newText = currentText.slice(0, cursorPos) + emoji.textContent + currentText.slice(cursorPos);
+                messageInput.value = newText;
+                messageInput.focus();
+                const newCursorPos = cursorPos + emoji.textContent.length;
+                messageInput.setSelectionRange(newCursorPos, newCursorPos);
+                emojiPicker.classList.add('hidden');
+            });
+        });
+    }
+
 });

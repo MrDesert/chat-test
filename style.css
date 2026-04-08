@@ -239,3 +239,56 @@ button:hover {
         width: 80px;
     }
 }
+/* Панель со смайликами */
+.emoji-picker-container {
+    position: relative;
+}
+
+.emoji-btn {
+    background: #e0e0e0;
+    font-size: 20px;
+    padding: 8px 12px;
+    border-radius: 20px;
+}
+
+.emoji-btn:hover {
+    background: #ccc;
+}
+
+.emoji-picker {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 280px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 8px;
+}
+
+.emoji-picker.hidden {
+    display: none;
+}
+
+.emoji-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.emoji {
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: transform 0.1s;
+}
+
+.emoji:hover {
+    background: #f0f0f0;
+    transform: scale(1.2);
+}
