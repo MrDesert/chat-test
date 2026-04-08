@@ -76,7 +76,8 @@ server.on('connection', (ws) => {
                 const message = {
                     type: 'message',
                     nick: client.name,
-                    text: data.text
+                    text: data.text, 
+                    timestamp: Date.now()  // Добавляем время
                 };
                 // Рассылаем всем (включая отправителя)
                 clients.forEach(c => {
