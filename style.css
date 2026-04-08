@@ -472,6 +472,11 @@ button:hover {
     .sidebar-header {
         padding: 8px 12px;
     }
+    .chat-footer {
+        bottom: 60px;
+        left: 8px;
+        font-size: 9px;
+    }
 }
 
 /* Текст можно выделять, но курсор — стрелка, без палочки */
@@ -509,4 +514,19 @@ button, .msg-btn, .emoji-btn, .file-btn, .preview-remove, #send, #changeNickBtn,
 /* Запрещаем браузеру думать, что в сообщения можно печатать */
 .message, .message * {
     -webkit-tap-highlight-color: transparent;
+}
+/* Авторство */
+.chat-footer {
+    position: fixed;
+    bottom: 8px;
+    left: 16px;
+    font-size: 11px;
+    color: #bbb;
+    background: rgba(255,255,255,0.7);
+    padding: 4px 10px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    font-family: monospace;
+    pointer-events: none; /* чтобы не мешать кликать */
 }
