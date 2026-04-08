@@ -103,7 +103,47 @@ server.on('connection', (ws) => {
                 // Отправляем отправителю
                 ws.send(JSON.stringify(message));
             }
-            
+            // === КАРТИНКА В ОБЩИЙ ЧАТ ===
+else if (data.type === 'public_image') {
+    const message = {
+        type: 'public_image',
+        nick: sender.name,
+        image: data.image,
+        filename: data.filename,
+        timestamp: Date.now()
+    };
+    clients.forEach(c => {
+        if (c.ws.readyState === WebSocket.OPEN) {
+            c.ws.send(JSON.stringify(message));
+        }
+    });
+}
+
+// === КАРТИНКА В ЛИЧНЫЙ ЧАТ ===
+else if (data.type === 'private_image') {
+    const recipientName = data.to;
+    const recipient = findClientByName(recipientName);
+    
+    if (!recipient) {
+        ws.send(JSON.stringify({
+            type: 'error',
+            text: `Пользователь ${recipientName} не найден`
+        }));
+        return;
+    }
+    
+    const message = {
+        type: 'private_image',
+        from: sender.name,
+        to: recipientName,
+        image: data.image,
+        filename: data.filename,
+        timestamp: Date.now()
+    };
+    
+    sendToUser(recipientName, message);
+    ws.send(JSON.stringify(message));
+}
             // === СМЕНА НИКА ===
             else if (data.type === 'nick') {
                 const newName = data.nick.trim();

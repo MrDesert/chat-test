@@ -34,8 +34,8 @@ function escapeHtml(str) {
 function renderCurrentChat() {
     const chatDiv = document.getElementById('chat');
     
+    // === ОБЩИЙ ЧАТ ===
     if (currentChatWith === null) {
-        // Общий чат
         document.getElementById('currentChatTitle').innerHTML = '💬 Общий чат';
         document.getElementById('closeChatBtn').style.display = 'none';
         
@@ -46,6 +46,23 @@ function renderCurrentChat() {
         
         chatDiv.innerHTML = publicMessages.map(msg => {
             const isOwn = (msg.nick === currentNick);
+            
+            // Картинка
+            if (msg.type === 'image') {
+                return `
+                    <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
+                        <div class="message ${isOwn ? 'own' : 'other'}">
+                            <strong>${escapeHtml(msg.nick)}</strong>:<br>
+                            <div class="image-message">
+                                <img src="${msg.image}" alt="${escapeHtml(msg.filename)}" data-filename="${escapeHtml(msg.filename)}">
+                            </div>
+                        </div>
+                        <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+                    </div>
+                `;
+            }
+            
+            // Текст
             return `
                 <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
                     <div class="message ${isOwn ? 'own' : 'other'}">
@@ -59,7 +76,7 @@ function renderCurrentChat() {
         return;
     }
     
-    // Личный чат
+    // === ЛИЧНЫЙ ЧАТ ===
     document.getElementById('currentChatTitle').innerHTML = `💬 Чат с ${escapeHtml(currentChatWith)}`;
     document.getElementById('closeChatBtn').style.display = 'inline-block';
     
@@ -71,6 +88,23 @@ function renderCurrentChat() {
     
     chatDiv.innerHTML = messages.map(msg => {
         const sender = msg.isOwn ? 'Вы' : msg.from;
+        
+        // Картинка
+        if (msg.type === 'image') {
+            return `
+                <div class="message-wrapper ${msg.isOwn ? 'own' : 'other'}">
+                    <div class="message ${msg.isOwn ? 'own' : 'other'}">
+                        <strong>${escapeHtml(sender)}</strong>:<br>
+                        <div class="image-message">
+                            <img src="${msg.image}" alt="${escapeHtml(msg.filename)}" data-filename="${escapeHtml(msg.filename)}">
+                        </div>
+                    </div>
+                    <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+                </div>
+            `;
+        }
+        
+        // Текст
         return `
             <div class="message-wrapper ${msg.isOwn ? 'own' : 'other'}">
                 <div class="message ${msg.isOwn ? 'own' : 'other'}">
@@ -129,6 +163,73 @@ function addErrorMessage(text) {
     chatDiv.appendChild(msgDiv);
     chatDiv.scrollTop = chatDiv.scrollHeight;
     setTimeout(() => msgDiv.remove(), 4000);
+}
+
+function sendPublicImage(base64Data, filename) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addErrorMessage("Нет соединения с сервером");
+        return false;
+    }
+    ws.send(JSON.stringify({
+        type: 'public_image',
+        image: base64Data,
+        filename: filename,
+        timestamp: Date.now()
+    }));
+    return true;
+}
+
+function sendPrivateImage(to, base64Data, filename) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addErrorMessage("Нет соединения с сервером");
+        return false;
+    }
+    ws.send(JSON.stringify({
+        type: 'private_image',
+        to: to,
+        image: base64Data,
+        filename: filename,
+        timestamp: Date.now()
+    }));
+    return true;
+}
+
+function addPublicImage(nick, imageData, filename, timestamp) {
+    publicMessages.push({
+        type: 'image',
+        nick: nick,
+        image: imageData,
+        filename: filename,
+        timestamp: timestamp,
+        id: msgCounter++
+    });
+    if (currentChatWith === null) {
+        renderCurrentChat();
+    }
+}
+
+function addPrivateImage(from, to, imageData, filename, timestamp) {
+    const other = (from === currentNick) ? to : from;
+    if (!privateMessages[other]) privateMessages[other] = [];
+    
+    privateMessages[other].push({
+        type: 'image',
+        from: from,
+        to: to,
+        image: imageData,
+        filename: filename,
+        timestamp: timestamp,
+        isOwn: (from === currentNick),
+        id: msgCounter++
+    });
+    
+    if (currentChatWith === other) {
+        renderCurrentChat();
+    } else {
+        if (!unreadCount[other]) unreadCount[other] = 0;
+        unreadCount[other]++;
+        updateUserListUI();
+    }
 }
 
 function updateUserListUI() {
@@ -200,7 +301,30 @@ function closeCurrentChat() {
 }
 
 function sendMessage() {
-    const text = document.getElementById('message').value.trim();
+    // Сначала отправляем картинку, если есть
+    if (window.pendingImage) {
+        const { imageData, filename } = window.pendingImage;
+        
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            addErrorMessage("Нет соединения с сервером");
+            return;
+        }
+        
+        if (currentChatWith === null) {
+            sendPublicImage(imageData, filename);
+        } else {
+            sendPrivateImage(currentChatWith, imageData, filename);
+        }
+        
+        // Удаляем превью и очищаем pending
+        const preview = document.getElementById('imagePreview');
+        if (preview) preview.remove();
+        window.pendingImage = null;
+        return;
+    }
+    
+    // Отправка текста
+    let text = document.getElementById('message').value.trim();
     if (!text) return;
     
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -262,6 +386,12 @@ function connect() {
                 currentNick = data.nick;
                 document.getElementById('nickInfo').innerText = currentNick;
                 addSystemMessage(`Теперь вы ${currentNick}`);
+            }
+            else if (data.type === 'public_image') {
+                addPublicImage(data.nick, data.image, data.filename, data.timestamp);
+            }
+            else if (data.type === 'private_image') {
+                addPrivateImage(data.from, data.to, data.image, data.filename, data.timestamp);
             }
         } catch(e) {
             console.error(e);
@@ -326,4 +456,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     connect();
+
+    // Отправка картинок — с предпросмотром
+const fileInput = document.getElementById('fileInput');
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (!file.type.startsWith('image/')) {
+            addErrorMessage("Можно отправлять только картинки");
+            fileInput.value = '';
+            return;
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+            addErrorMessage("Картинка не больше 2 МБ");
+            fileInput.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const imageData = ev.target.result;
+            const filename = file.name;
+            
+            showImagePreview(imageData, filename);
+            window.pendingImage = { imageData, filename };
+            fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function showImagePreview(imageData, filename) {
+    const oldPreview = document.getElementById('imagePreview');
+    if (oldPreview) oldPreview.remove();
+    
+    const previewDiv = document.createElement('div');
+    previewDiv.id = 'imagePreview';
+    previewDiv.className = 'image-preview';
+    previewDiv.innerHTML = `
+        <div class="preview-container">
+            <img src="${imageData}" alt="${escapeHtml(filename)}">
+            <span class="preview-filename">${escapeHtml(filename)}</span>
+            <button class="preview-remove">✕</button>
+        </div>
+    `;
+    
+    const panel = document.querySelector('.panel');
+    const messageInput = document.getElementById('message');
+    panel.insertBefore(previewDiv, messageInput);
+    
+    previewDiv.querySelector('.preview-remove').onclick = () => {
+        previewDiv.remove();
+        window.pendingImage = null;
+    };
+}
 });
