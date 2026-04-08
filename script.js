@@ -301,7 +301,7 @@ function closeCurrentChat() {
 }
 
 function sendMessage() {
-    // Сначала отправляем картинку, если есть
+    // Отправка картинки
     if (window.pendingImage) {
         const { imageData, filename } = window.pendingImage;
         
@@ -316,9 +316,8 @@ function sendMessage() {
             sendPrivateImage(currentChatWith, imageData, filename);
         }
         
-        // Удаляем превью и очищаем pending
-        const preview = document.getElementById('imagePreview');
-        if (preview) preview.remove();
+        // Очищаем превью И сбрасываем pendingImage
+        clearImagePreview();
         window.pendingImage = null;
         return;
     }
@@ -339,6 +338,14 @@ function sendMessage() {
     }
     
     document.getElementById('message').value = '';
+}
+
+function clearImagePreview() {
+    const container = document.getElementById('imagePreviewContainer');
+    if (container) {
+        container.innerHTML = '';
+    }
+    window.pendingImage = null;
 }
 
 function changeNick() {
