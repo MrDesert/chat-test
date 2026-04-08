@@ -12,9 +12,76 @@
             margin: 0;
             height: 100vh;
             display: flex;
-            flex-direction: column;
             background: #f5f5f5;
         }
+        
+        /* Основная область чата */
+        .chat-main {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        /* Боковая панель с онлайн-пользователями */
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #ddd;
+            background: #fafafa;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        .online-count {
+            color: #4caf50;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        
+        .user-list {
+            flex: 1;
+            padding: 8px 0;
+        }
+        
+        .user-item {
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        
+        .user-item .status {
+            width: 8px;
+            height: 8px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .user-item .name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .user-item.current {
+            background: #e8f0fe;
+            font-weight: 500;
+        }
+        
         #chat {
             flex: 1;
             overflow-y: auto;
@@ -23,6 +90,7 @@
             flex-direction: column;
             gap: 8px;
         }
+        
         .message-wrapper {
             display: flex;
             flex-direction: column;
@@ -57,7 +125,6 @@
             margin-top: 2px;
             margin-left: 8px;
             margin-right: 8px;
-            letter-spacing: 0.3px;
         }
         .system {
             background: #e0e0e0;
@@ -84,7 +151,6 @@
             border-top: 1px solid #ddd;
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
         }
         input, button {
             padding: 10px;
@@ -93,9 +159,6 @@
             border-radius: 20px;
         }
         #message {
-            flex: 2;
-        }
-        #nickInput {
             flex: 1;
         }
         button {
@@ -113,7 +176,6 @@
             border-radius: 20px;
             font-size: 14px;
             color: #0066cc;
-            text-align: center;
         }
         .panel-top {
             background: white;
@@ -129,6 +191,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         #changeNickBtn {
             background: #4caf50;
@@ -148,55 +211,74 @@
             color: #888;
             padding: 4px 12px;
         }
+        
+        @media (max-width: 600px) {
+            .sidebar {
+                width: 180px;
+            }
+            .nick-control {
+                flex-wrap: wrap;
+            }
+            #nickInput {
+                width: 80px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="panel-top">
-        <span>💬 Мини-чат</span>
-        <div class="nick-control">
-            <input type="text" id="nickInput" placeholder="Новый ник" maxlength="20">
-            <button id="changeNickBtn">Сменить ник</button>
-            <span id="nickInfo">Подключение...</span>
+    <div class="chat-main">
+        <div class="panel-top">
+            <span>💬 Мини-чат</span>
+            <div class="nick-control">
+                <input type="text" id="nickInput" placeholder="Новый ник" maxlength="20">
+                <button id="changeNickBtn">Сменить</button>
+                <span id="nickInfo">Подключение...</span>
+            </div>
+        </div>
+        <div id="chat"></div>
+        <div class="panel">
+            <input type="text" id="message" placeholder="Сообщение" autocomplete="off">
+            <button id="send">Отправить</button>
+        </div>
+        <div class="hint">💡 Команда: /nick НовоеИмя — сменить никнейм</div>
+    </div>
+    
+    <div class="sidebar">
+        <div class="sidebar-header">
+            👥 Онлайн
+            <div class="online-count" id="onlineCount">0 человек</div>
+        </div>
+        <div class="user-list" id="userList">
+            <div style="padding: 16px; color: #888; text-align: center;">Загрузка...</div>
         </div>
     </div>
-    <div id="chat"></div>
-    <div class="panel">
-        <input type="text" id="message" placeholder="Сообщение" autocomplete="off">
-        <button id="send">Отправить</button>
-    </div>
-    <div class="hint">💡 Команда: /nick НовоеИмя — сменить никнейм</div>
 
     <script>
         const WS_URL = "wss://chat-test-gb86.onrender.com";
 
         let ws = null;
         let currentNick = "";
-        
-        // Хранилище сообщений и таймер для обновления таймштампов
         let messagesList = [];
         let updateInterval = null;
+        let msgCounter = 0;
 
         function formatTimestamp(timestamp) {
             const now = Date.now();
-            const diff = now - timestamp; // разница в миллисекундах
-            
+            const diff = now - timestamp;
             const seconds = Math.floor(diff / 1000);
             const minutes = Math.floor(seconds / 60);
             const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
             
             if (seconds < 10) return "только что";
             if (seconds < 60) return `${seconds} сек назад`;
             if (minutes < 60) return `${minutes} мин назад`;
             if (hours < 2) return `${hours} час назад`;
             
-            // Если больше 2 часов — показываем точное время
             const date = new Date(timestamp);
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
 
         function updateAllTimestamps() {
-            const now = Date.now();
             messagesList.forEach(item => {
                 const timestampEl = document.getElementById(`ts-${item.id}`);
                 if (timestampEl) {
@@ -208,12 +290,9 @@
             });
         }
 
-        // Запускаем обновление таймштампов каждую минуту
         function startTimestampUpdater() {
             if (updateInterval) clearInterval(updateInterval);
-            updateInterval = setInterval(() => {
-                updateAllTimestamps();
-            }, 60000); // каждую минуту
+            updateInterval = setInterval(updateAllTimestamps, 60000);
         }
 
         function addMessage(nick, text, isOwn, timestamp, msgId) {
@@ -236,8 +315,26 @@
             chatDiv.appendChild(wrapper);
             chatDiv.scrollTop = chatDiv.scrollHeight;
             
-            // Сохраняем в массив для последующего обновления
             messagesList.push({ id: msgId, timestamp });
+        }
+
+        function updateUserList(users) {
+            const userListDiv = document.getElementById('userList');
+            const count = users.length;
+            document.getElementById('onlineCount').innerText = `${count} ${count === 1 ? 'человек' : 'человек'}`;
+            
+            if (users.length === 0) {
+                userListDiv.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">Никого нет</div>';
+                return;
+            }
+            
+            userListDiv.innerHTML = users.map(name => `
+                <div class="user-item ${name === currentNick ? 'current' : ''}">
+                    <span class="status"></span>
+                    <span class="name">${escapeHtml(name)}</span>
+                    ${name === currentNick ? '<span style="font-size: 10px; color: #888;">(вы)</span>' : ''}
+                </div>
+            `).join('');
         }
 
         function addSystemMessage(text) {
@@ -267,8 +364,6 @@
             });
         }
 
-        let msgCounter = 0;
-
         function connect() {
             ws = new WebSocket(WS_URL);
             ws.onopen = () => console.log("Соединено");
@@ -295,6 +390,9 @@
                         currentNick = data.nick;
                         document.getElementById('nickInfo').innerText = currentNick;
                         addSystemMessage(`Вы теперь ${currentNick}`);
+                    }
+                    else if (data.type === 'user_list') {
+                        updateUserList(data.users);
                     }
                 } catch(e) {
                     console.error(e);

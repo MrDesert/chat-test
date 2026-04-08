@@ -4,12 +4,11 @@ const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
 let clients = [];
 let nextId = 1;
 
-// Вспомогательная функция: поиск клиента по имени
 function findClientByName(name) {
     return clients.find(c => c.name.toLowerCase() === name.toLowerCase());
 }
 
-// Вспомогательная функция: рассылка всем (кроме опционального отправителя)
+// Рассылка всем (опционально исключая отправителя)
 function broadcast(data, excludeWs = null) {
     clients.forEach(client => {
         if (client.ws !== excludeWs && client.ws.readyState === WebSocket.OPEN) {
@@ -18,9 +17,15 @@ function broadcast(data, excludeWs = null) {
     });
 }
 
-// Вспомогательная функция: уведомление в чат
+// Рассылка системного сообщения
 function broadcastSystemMessage(text, excludeWs = null) {
     broadcast({ type: 'system', text }, excludeWs);
+}
+
+// Рассылка актуального списка пользователей
+function broadcastUserList() {
+    const userList = clients.map(c => c.name);
+    broadcast({ type: 'user_list', users: userList });
 }
 
 server.on('connection', (ws) => {
@@ -31,18 +36,17 @@ server.on('connection', (ws) => {
     // Отправляем клиенту его имя
     ws.send(JSON.stringify({ type: 'init', nick: guestName }));
     
-    // Оповещаем всех, что новый пользователь зашёл
+    // Оповещаем всех о новом пользователе
     broadcastSystemMessage(`${guestName} присоединился к чату`);
+    broadcastUserList(); // ← обновляем список онлайн
 
     ws.on('message', (raw) => {
         try {
             const data = JSON.parse(raw);
             
-            // Обработка команды смены ника
             if (data.type === 'nick') {
                 const newName = data.nick.trim();
                 
-                // Проверки
                 if (!newName || newName.length < 2) {
                     ws.send(JSON.stringify({ type: 'error', text: 'Имя должно быть не короче 2 символов' }));
                     return;
@@ -63,23 +67,19 @@ server.on('connection', (ws) => {
                 const oldName = client.name;
                 client.name = newName;
                 
-                // Подтверждение смены ника для самого пользователя
                 ws.send(JSON.stringify({ type: 'nick_changed', nick: newName }));
-                
-                // Оповещение всех о смене имени
                 broadcastSystemMessage(`${oldName} → ${newName}`);
+                broadcastUserList(); // ← обновляем список после смены ника
                 return;
             }
             
-            // Обычное сообщение
             if (data.text) {
                 const message = {
                     type: 'message',
                     nick: client.name,
-                    text: data.text, 
-                    timestamp: Date.now()  // Добавляем время
+                    text: data.text,
+                    timestamp: Date.now()
                 };
-                // Рассылаем всем (включая отправителя)
                 clients.forEach(c => {
                     if (c.ws.readyState === WebSocket.OPEN) {
                         c.ws.send(JSON.stringify(message));
@@ -95,6 +95,7 @@ server.on('connection', (ws) => {
             const leftName = clients[index].name;
             clients.splice(index, 1);
             broadcastSystemMessage(`${leftName} покинул чат`);
+            broadcastUserList(); // ← обновляем список после выхода
         }
     });
 });
