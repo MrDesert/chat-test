@@ -108,6 +108,49 @@ function escapeHtml(str) {
     });
 }
 
+function sendImage(base64Data, filename) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addErrorMessage("Нет соединения с сервером");
+        return;
+    }
+    
+    const message = {
+        type: 'image',
+        nick: currentNick,
+        image: base64Data,
+        filename: filename,
+        timestamp: Date.now()
+    };
+    ws.send(JSON.stringify(message));
+}
+
+function addImageMessage(nick, imageData, filename, isOwn, timestamp, msgId) {
+    const chatDiv = document.getElementById('chat');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper ' + (isOwn ? 'own' : 'other');
+    wrapper.id = `msg-${msgId}`;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + (isOwn ? 'own' : 'other');
+    
+    const nameSpan = `<strong>${escapeHtml(nick)}</strong>`;
+    const imgElement = `<div class="image-message"><img src="${imageData}" alt="${escapeHtml(filename)}" title="${escapeHtml(filename)}"></div>`;
+    
+    messageDiv.innerHTML = nameSpan + ': ' + imgElement;
+    
+    const timestampDiv = document.createElement('div');
+    timestampDiv.className = 'timestamp';
+    timestampDiv.id = `ts-${msgId}`;
+    timestampDiv.innerText = formatTimestamp(timestamp);
+    
+    wrapper.appendChild(messageDiv);
+    wrapper.appendChild(timestampDiv);
+    chatDiv.appendChild(wrapper);
+    chatDiv.scrollTop = chatDiv.scrollHeight;
+    
+    messagesList.push({ id: msgId, timestamp });
+}
+
 function connect() {
     ws = new WebSocket(WS_URL);
     ws.onopen = () => console.log("Соединено");
@@ -234,5 +277,33 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Отправка картинок
+const fileInput = document.getElementById('fileInput');
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (!file.type.startsWith('image/')) {
+            addErrorMessage("Можно отправлять только картинки");
+            fileInput.value = '';
+            return;
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+            addErrorMessage("Картинка не больше 2 МБ");
+            fileInput.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            sendImage(ev.target.result, file.name);
+            fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 });

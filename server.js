@@ -38,7 +38,7 @@ server.on('connection', (ws) => {
     
     // Оповещаем всех о новом пользователе
     broadcastSystemMessage(`${guestName} присоединился к чату`);
-    broadcastUserList(); // ← обновляем список онлайн
+    broadcastUserList();
 
     ws.on('message', (raw) => {
         try {
@@ -69,10 +69,11 @@ server.on('connection', (ws) => {
                 
                 ws.send(JSON.stringify({ type: 'nick_changed', nick: newName }));
                 broadcastSystemMessage(`${oldName} → ${newName}`);
-                broadcastUserList(); // ← обновляем список после смены ника
+                broadcastUserList();
                 return;
             }
             
+            // Обычное текстовое сообщение
             if (data.text) {
                 const message = {
                     type: 'message',
@@ -85,8 +86,29 @@ server.on('connection', (ws) => {
                         c.ws.send(JSON.stringify(message));
                     }
                 });
+                return;
             }
-        } catch(e) {}
+            
+            // ← НОВЫЙ БЛОК: обработка картинок
+            if (data.type === 'image') {
+                const message = {
+                    type: 'image',
+                    nick: client.name,
+                    image: data.image,
+                    filename: data.filename,
+                    timestamp: Date.now()
+                };
+                clients.forEach(c => {
+                    if (c.ws.readyState === WebSocket.OPEN) {
+                        c.ws.send(JSON.stringify(message));
+                    }
+                });
+                return;
+            }
+            
+        } catch(e) {
+            console.error('Ошибка обработки сообщения:', e);
+        }
     });
 
     ws.on('close', () => {
@@ -95,7 +117,7 @@ server.on('connection', (ws) => {
             const leftName = clients[index].name;
             clients.splice(index, 1);
             broadcastSystemMessage(`${leftName} покинул чат`);
-            broadcastUserList(); // ← обновляем список после выхода
+            broadcastUserList();
         }
     });
 });
