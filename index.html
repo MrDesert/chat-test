@@ -42,9 +42,19 @@
         .message strong {
             color: #0066cc;
         }
-        .info {
+        .system {
             background: #e0e0e0;
             color: #555;
+            text-align: center;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 16px;
+            align-self: center;
+            max-width: 80%;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
             text-align: center;
             font-size: 12px;
             padding: 4px 8px;
@@ -57,6 +67,7 @@
             border-top: 1px solid #ddd;
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
         input, button {
             padding: 10px;
@@ -65,6 +76,9 @@
             border-radius: 20px;
         }
         #message {
+            flex: 2;
+        }
+        #nickInput {
             flex: 1;
         }
         button {
@@ -91,19 +105,48 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .nick-control {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #changeNickBtn {
+            background: #4caf50;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        #changeNickBtn:hover {
+            background: #45a049;
+        }
+        #nickInput {
+            padding: 6px 12px;
+            font-size: 14px;
+            width: 120px;
+        }
+        .hint {
+            font-size: 11px;
+            color: #888;
         }
     </style>
 </head>
 <body>
     <div class="panel-top">
         <span>💬 Мини-чат</span>
-        <span id="nickInfo">Подключение...</span>
+        <div class="nick-control">
+            <input type="text" id="nickInput" placeholder="Новый ник" maxlength="20">
+            <button id="changeNickBtn">Сменить ник</button>
+            <span id="nickInfo">Подключение...</span>
+        </div>
     </div>
     <div id="chat"></div>
     <div class="panel">
         <input type="text" id="message" placeholder="Сообщение" autocomplete="off">
         <button id="send">Отправить</button>
     </div>
+    <div class="hint" style="padding: 4px 12px;">💡 Команда: /nick НовоеИмя — сменить никнейм</div>
 
     <script>
         const WS_URL = "wss://chat-test-gb86.onrender.com";
@@ -117,14 +160,29 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    
                     if (data.type === 'init') {
                         currentNick = data.nick;
-                        document.getElementById('nickInfo').innerText = `Вы: ${currentNick}`;
-                    } else if (data.type === 'message') {
+                        document.getElementById('nickInfo').innerText = currentNick;
+                    } 
+                    else if (data.type === 'message') {
                         const isOwn = (data.nick === currentNick);
                         addMessage(data.nick, data.text, isOwn);
                     }
-                } catch(e) {}
+                    else if (data.type === 'system') {
+                        addSystemMessage(data.text);
+                    }
+                    else if (data.type === 'error') {
+                        addErrorMessage(data.text);
+                    }
+                    else if (data.type === 'nick_changed') {
+                        currentNick = data.nick;
+                        document.getElementById('nickInfo').innerText = currentNick;
+                        addSystemMessage(`Вы теперь ${currentNick}`);
+                    }
+                } catch(e) {
+                    console.error(e);
+                }
             };
             ws.onclose = () => {
                 console.log("Отключено, переподключение через 3с");
@@ -144,8 +202,17 @@
         function addSystemMessage(text) {
             const chatDiv = document.getElementById('chat');
             const msgDiv = document.createElement('div');
-            msgDiv.className = 'info';
+            msgDiv.className = 'system';
             msgDiv.innerText = text;
+            chatDiv.appendChild(msgDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+
+        function addErrorMessage(text) {
+            const chatDiv = document.getElementById('chat');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'error';
+            msgDiv.innerText = '⚠️ ' + text;
             chatDiv.appendChild(msgDiv);
             chatDiv.scrollTop = chatDiv.scrollHeight;
         }
@@ -159,12 +226,36 @@
             });
         }
 
+        function changeNick() {
+            const newNick = document.getElementById('nickInput').value.trim();
+            if (!newNick) {
+                addErrorMessage("Введите новый ник");
+                return;
+            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addErrorMessage("Нет соединения с сервером");
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'nick', nick: newNick }));
+            document.getElementById('nickInput').value = '';
+        }
+
         function sendMessage() {
-            const text = document.getElementById('message').value.trim();
+            let text = document.getElementById('message').value.trim();
             if (!text) return;
 
+            // Проверка на команду /nick
+            if (text.startsWith('/nick ')) {
+                const newNick = text.slice(6).trim();
+                if (newNick) {
+                    changeNickManual(newNick);
+                }
+                document.getElementById('message').value = '';
+                return;
+            }
+
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                alert("Сервер ещё не подключён");
+                addErrorMessage("Сервер ещё не подключён");
                 return;
             }
 
@@ -172,9 +263,21 @@
             document.getElementById('message').value = '';
         }
 
+        function changeNickManual(newNick) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addErrorMessage("Нет соединения с сервером");
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'nick', nick: newNick }));
+        }
+
         document.getElementById('send').onclick = sendMessage;
+        document.getElementById('changeNickBtn').onclick = changeNick;
         document.getElementById('message').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
+        });
+        document.getElementById('nickInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') changeNick();
         });
 
         connect();
