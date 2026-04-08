@@ -24,12 +24,20 @@
             gap: 8px;
         }
         .message {
-            background: white;
             padding: 8px 12px;
             border-radius: 12px;
             max-width: 80%;
             word-wrap: break-word;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .message.own {
+            background: #dcf8c5;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .message.other {
+            background: white;
+            align-self: flex-start;
         }
         .message strong {
             color: #0066cc;
@@ -74,10 +82,10 @@
     </div>
 
     <script>
-        // ПОДСТАВЬ СВОЙ URL ОТ RENDER
         const WS_URL = "wss://chat-test-gb86.onrender.com";
 
         let ws = null;
+        let currentNick = "";
 
         function connect() {
             ws = new WebSocket(WS_URL);
@@ -85,7 +93,8 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    addMessage(data.nick, data.text);
+                    const isOwn = (data.nick === currentNick);
+                    addMessage(data.nick, data.text, isOwn);
                 } catch(e) {}
             };
             ws.onclose = () => {
@@ -94,10 +103,10 @@
             };
         }
 
-        function addMessage(nick, text) {
+        function addMessage(nick, text, isOwn) {
             const chatDiv = document.getElementById('chat');
             const msgDiv = document.createElement('div');
-            msgDiv.className = 'message';
+            msgDiv.className = 'message ' + (isOwn ? 'own' : 'other');
             msgDiv.innerHTML = `<strong>${escapeHtml(nick)}</strong>: ${escapeHtml(text)}`;
             chatDiv.appendChild(msgDiv);
             chatDiv.scrollTop = chatDiv.scrollHeight;
@@ -113,7 +122,7 @@
         }
 
         function sendMessage() {
-            const nick = document.getElementById('nick').value.trim() || "Без имени";
+            currentNick = document.getElementById('nick').value.trim() || "Без имени";
             const text = document.getElementById('message').value.trim();
             if (!text) return;
 
@@ -122,7 +131,7 @@
                 return;
             }
 
-            const data = { nick, text };
+            const data = { nick: currentNick, text };
             ws.send(JSON.stringify(data));
             document.getElementById('message').value = '';
         }
