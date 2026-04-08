@@ -23,6 +23,7 @@
             <div class="placeholder">💬 Напишите первое сообщение в общий чат</div>
         </div>
         <div class="panel">
+            < class="panel-input-area">
             <div class="emoji-picker-container">
                 <button id="emojiBtn" class="emoji-btn">😊</button>
                 <div id="emojiPicker" class="emoji-picker hidden">
@@ -45,9 +46,10 @@
                 </div>
             </div>
             <label for="fileInput" class="file-btn">📎</label>
-            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
             <input type="text" id="message" placeholder="Сообщение" autocomplete="off">
             <button id="send">Отправить</button>
+            </div>
+            <div id="imagePreviewContainer" class="image-preview-container"></div>
         </div>
     </div>
     
@@ -65,9 +67,9 @@
         <span class="modal-close">&times;</span>
         <img class="modal-content" id="modalImage">
     </div>
-    <footer style="z-index: 4;">© MrDesert - v0.0.0.2.4</footer>
     <script src="script.js"></script>
 </body>
+    <footer style="z-index: 4;">© MrDesert - v0.0.0.2.4</footer>
 </html>
                         <!-- <span class="emoji">😀</span><span class="emoji">😃</span><span class="emoji">😄</span>
                         <span class="emoji">😁</span><span class="emoji">😅</span><span class="emoji">😂</span>
