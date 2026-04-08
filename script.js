@@ -312,4 +312,29 @@ if (fileInput) {
     });
 }
 
+// Модальное окно для увеличения картинок
+const modal = document.getElementById('imageModal');
+const modalImg = document.getElementById('modalImage');
+const modalClose = document.querySelector('.modal-close');
+
+// Открытие модального окна при клике на любую картинку в чате
+document.getElementById('chat').addEventListener('click', (e) => {
+    if (e.target.tagName === 'IMG') {
+        modal.style.display = 'block';
+        modalImg.src = e.target.src;
+    }
+});
+
+// Закрытие по клику на крестик
+if (modalClose) {
+    modalClose.onclick = () => {
+        modal.style.display = 'none';
+    };
+}
+
+// Закрытие по клику на фон
+modal.onclick = () => {
+    modal.style.display = 'none';
+};
+
 });
