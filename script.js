@@ -490,11 +490,17 @@ if (fileInput) {
 }
 
 function showImagePreview(imageData, filename) {
-    const oldPreview = document.getElementById('imagePreview');
-    if (oldPreview) oldPreview.remove();
+    const container = document.getElementById('imagePreviewContainer');
+    if (!container) {
+        console.error("imagePreviewContainer not found");
+        return;
+    }
     
+    // Очищаем контейнер
+    container.innerHTML = '';
+    
+    // Создаём превью
     const previewDiv = document.createElement('div');
-    previewDiv.id = 'imagePreview';
     previewDiv.className = 'image-preview';
     previewDiv.innerHTML = `
         <div class="preview-container">
@@ -504,13 +510,15 @@ function showImagePreview(imageData, filename) {
         </div>
     `;
     
-    const panel = document.querySelector('.panel');
-    const messageInput = document.getElementById('message');
-    panel.insertBefore(previewDiv, messageInput);
+    container.appendChild(previewDiv);  // ← используем appendChild вместо insertBefore
     
-    previewDiv.querySelector('.preview-remove').onclick = () => {
-        previewDiv.remove();
-        window.pendingImage = null;
-    };
+    // Кнопка удаления
+    const removeBtn = previewDiv.querySelector('.preview-remove');
+    if (removeBtn) {
+        removeBtn.onclick = () => {
+            container.innerHTML = '';
+            window.pendingImage = null;
+        };
+    }
 }
 });
