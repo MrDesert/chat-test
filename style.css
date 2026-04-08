@@ -473,3 +473,40 @@ button:hover {
         padding: 8px 12px;
     }
 }
+
+/* Текст можно выделять, но курсор — стрелка, без палочки */
+.message,
+.message *,
+.system,
+.error,
+.user-item .name,
+.sidebar-header,
+.online-count,
+.chat-header,
+#nickInfo,
+.hint,
+.timestamp,
+.preview-filename {
+    cursor: default;
+    /* НЕ отключаем user-select — выделение остаётся */
+}
+
+/* Для полей ввода оставляем палочку и текстовый курсор */
+input, textarea, #nickInput, #message {
+    cursor: text;
+}
+
+/* Для кнопок — рука */
+button, .msg-btn, .emoji-btn, .file-btn, .preview-remove, #send, #changeNickBtn, .close-chat {
+    cursor: pointer;
+}
+
+/* Картинки — рука */
+.message img {
+    cursor: pointer;
+}
+
+/* Запрещаем браузеру думать, что в сообщения можно печатать */
+.message, .message * {
+    -webkit-tap-highlight-color: transparent;
+}
