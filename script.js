@@ -15,6 +15,7 @@ let publicMessages = [];
 let privateMessages = {};
 let unreadCount = {};
 let msgCounter = 0;
+let isVerifiedUser = false;  // true — авторизован по логину/паролю
 
 function formatTimestamp(timestamp) {
     const diff = Date.now() - timestamp;
@@ -254,7 +255,9 @@ function updateUserListUI() {
         const unread = unreadCount[name] || 0;
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
         const isActive = (currentChatWith === name);
-        
+            // Проверяем, авторизован ли пользователь (нужно хранить список)
+const isUserVerified = window.verifiedUsers && window.verifiedUsers.includes(name);
+const verifiedBadge = isUserVerified ? '<span class="verified">✅</span>' : '';
         if (isSelf) {
             return `
                 <div class="user-item ${isActive ? 'current' : ''}">
@@ -362,12 +365,17 @@ function changeNick() {
 
 function connect() {
     ws = new WebSocket(WS_URL);
-    ws.onopen = () => {
-        console.log("Соединено");
-        if (currentUser && currentUser.nickname) {
-            ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
-        }
-    };
+ws.onopen = () => {
+    console.log("Соединено");
+    if (currentUser && currentUser.nickname) {
+        ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+        // Отправляем статус авторизации
+        ws.send(JSON.stringify({ 
+            type: 'auth', 
+            isVerified: isVerifiedUser  // true для авторизованных, false для гостей
+        }));
+    }
+};
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
@@ -382,10 +390,11 @@ function connect() {
             else if (data.type === 'private') {
                 addPrivateMessage(data.from, data.to, data.text, data.timestamp);
             }
-            else if (data.type === 'user_list') {
-                window.userList = data.users;
-                updateUserListUI();
-            }
+else if (data.type === 'user_list') {
+    window.userList = data.users.map(u => u.name);
+    window.verifiedUsers = data.users.filter(u => u.isVerified).map(u => u.name);
+    updateUserListUI();
+}
             else if (data.type === 'system') {
                 addSystemMessage(data.text);
             }
@@ -564,7 +573,7 @@ async function checkAuth() {
             email: session.user.email,
             nickname: profile?.nickname || session.user.email.split('@')[0]
         };
-        
+        isVerifiedUser = true;
         document.body.classList.add('authorized');
         authModal.style.display = 'none';
         
@@ -574,6 +583,35 @@ async function checkAuth() {
     }
     return false;
 }
+
+// Показываем окно гостя
+function showGuestModal() {
+    const guestModal = document.getElementById('guestModal');
+    guestModal.style.display = 'flex';
+    
+    document.getElementById('setGuestNameBtn').onclick = () => {
+        const newName = document.getElementById('guestNameInput').value.trim();
+        if (newName && newName.length >= 2) {
+            currentUser = {
+                id: 'guest-' + Date.now(),
+                email: null,
+                nickname: newName
+            };
+            isVerifiedUser = false;
+            guestModal.style.display = 'none';
+            document.body.classList.add('authorized');
+            authModal.style.display = 'none';
+            connect();
+        } else {
+            alert("Имя должно быть не короче 2 символов");
+        }
+    };
+}
+
+// В функции для гостевой кнопки (вместо прямого создания)
+document.getElementById('guestBtn').onclick = () => {
+    showGuestModal();
+};
 
 // Обработчики событий
 document.getElementById('loginBtn').onclick = async () => {

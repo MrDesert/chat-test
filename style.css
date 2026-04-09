@@ -651,3 +651,9 @@ body.authorized .modal-overlay {
 #guestBtn:hover {
     background: #5a6268;
 }
+/* Галочка авторизованного пользователя */
+.user-item .verified {
+    color: #4caf50;
+    font-size: 14px;
+    margin-left: 4px;
+}

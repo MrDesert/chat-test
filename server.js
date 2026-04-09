@@ -3,6 +3,7 @@ const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
 
 let clients = [];
 let nextId = 1;
+let verifiedUsers = new Set(); // Храним id или имена авторизованных
 
 function findClientByName(name) {
     return clients.find(c => c.name.toLowerCase() === name.toLowerCase());
@@ -13,7 +14,10 @@ function findClientByWs(ws) {
 }
 
 function broadcastUserList() {
-    const userList = clients.map(c => c.name);
+    const userList = clients.map(c => ({
+        name: c.name,
+        isVerified: verifiedUsers.has(c.name)
+    }));
     clients.forEach(client => {
         if (client.ws.readyState === WebSocket.OPEN) {
             client.ws.send(JSON.stringify({
@@ -59,7 +63,16 @@ server.on('connection', (ws) => {
             const data = JSON.parse(raw);
             const sender = findClientByWs(ws);
             if (!sender) return;
-
+            // === АВТОРИЗАЦИЯ (новый тип сообщения) ===
+            if (data.type === 'auth') {
+                if (data.isVerified) {
+                    verifiedUsers.add(sender.name);
+                } else {
+                    verifiedUsers.delete(sender.name);
+                }
+                broadcastUserList(); // обновляем список для всех
+                return;
+            }
             // === ОБЩИЙ ЧАТ ===
             if (data.type === 'public') {
                 const message = {
@@ -180,6 +193,7 @@ else if (data.type === 'private_image') {
     });
 
     ws.on('close', () => {
+         verifiedUsers.delete(client.name);
         const index = clients.findIndex(c => c.ws === ws);
         if (index !== -1) {
             const leftName = clients[index].name;
