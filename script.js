@@ -498,9 +498,13 @@ async function login(username, password) {
     return true;
 }
 
-async function register(nickname, password, email = null) {
+async function register(nickname, email, password) {
     if (!nickname || nickname.length < 3) {
         showAuthMessage("Логин должен быть не короче 3 символов");
+        return false;
+    }
+    if (!email) {
+        showAuthMessage("Email обязателен");
         return false;
     }
     if (!password || password.length < 6) {
@@ -508,8 +512,8 @@ async function register(nickname, password, email = null) {
         return false;
     }
     
-    // Проверяем уникальность логина (никнейма)
-    const { data: existing } = await supabase2
+    // Проверяем уникальность логина
+    const { data: existing } = await window.supabase
         .from('profiles')
         .select('nickname')
         .eq('nickname', nickname)
@@ -520,10 +524,8 @@ async function register(nickname, password, email = null) {
         return false;
     }
     
-    // Регистрируем в Supabase
-    const fakeEmail = email ? email : `${nickname}@temp.local`;
-    const { data, error } = await supabase2.auth.signUp({
-        email: fakeEmail,
+    const { data, error } = await window.supabase.auth.signUp({
+        email: email,
         password: password,
         options: { data: { nickname: nickname } }
     });
@@ -533,7 +535,7 @@ async function register(nickname, password, email = null) {
         return false;
     }
     
-    showAuthMessage('Регистрация успешна! Теперь войдите', false);
+    showAuthMessage('Регистрация успешна! Проверьте почту для подтверждения', false);
     showLoginForm();
     return false;
 }
