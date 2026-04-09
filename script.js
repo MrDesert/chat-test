@@ -456,7 +456,7 @@ function showAuthMessage(text, isError = true) {
 
 async function login(username, password) {
     // Сначала находим email пользователя по логину
-    const { data: profile } = await supabase
+    const { data: profile } = await supabase2
         .from('profiles')
         .select('id')
         .eq('nickname', username)
@@ -468,7 +468,7 @@ async function login(username, password) {
     }
     
     // Получаем email пользователя из auth.users
-    const { data: userData } = await supabase
+    const { data: userData } = await supabase2
         .from('users')
         .select('email')
         .eq('id', profile.id)
@@ -479,7 +479,7 @@ async function login(username, password) {
         return false;
     }
     
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase2.auth.signInWithPassword({
         email: userData.email,
         password: password
     });
@@ -509,7 +509,7 @@ async function register(nickname, password, email = null) {
     }
     
     // Проверяем уникальность логина (никнейма)
-    const { data: existing } = await supabase
+    const { data: existing } = await supabase2
         .from('profiles')
         .select('nickname')
         .eq('nickname', nickname)
@@ -522,7 +522,7 @@ async function register(nickname, password, email = null) {
     
     // Регистрируем в Supabase
     const fakeEmail = email ? email : `${nickname}@temp.local`;
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase2.auth.signUp({
         email: fakeEmail,
         password: password,
         options: { data: { nickname: nickname } }
