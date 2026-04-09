@@ -454,49 +454,78 @@ function showAuthMessage(text, isError = true) {
     }, 3000);
 }
 
-async function login(email, password) {
-    const { data, error } = await supabase2.auth.signInWithPassword({ email, password });
+async function login(username, password) {
+    // Сначала находим email пользователя по логину
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('nickname', username)
+        .maybeSingle();
+    
+    if (!profile) {
+        showAuthMessage('Логин не найден');
+        return false;
+    }
+    
+    // Получаем email пользователя из auth.users
+    const { data: userData } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', profile.id)
+        .maybeSingle();
+    
+    if (!userData || !userData.email) {
+        showAuthMessage('Ошибка: у пользователя нет email');
+        return false;
+    }
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: userData.email,
+        password: password
+    });
+    
     if (error) {
         showAuthMessage(error.message);
         return false;
     }
     
-    const { data: profile } = await supabase2
-        .from('profiles')
-        .select('nickname')
-        .eq('id', data.user.id)
-        .single();
-    
     currentUser = {
         id: data.user.id,
         email: data.user.email,
-        nickname: profile?.nickname || data.user.email.split('@')[0]
+        nickname: username
     };
-    
-    await supabase2
-        .from('profiles')
-        .update({ last_seen: new Date() })
-        .eq('id', currentUser.id);
     
     return true;
 }
 
-async function register(nickname, email, password) {
-    const { data: existing } = await supabase2
-        .from('profiles')
-        .select('nickname')
-        .eq('nickname', nickname)
-        .single();
-    
-    if (existing) {
-        showAuthMessage('Никнейм уже занят');
+async function register(nickname, password, email = null) {
+    if (!nickname || nickname.length < 3) {
+        showAuthMessage("Логин должен быть не короче 3 символов");
+        return false;
+    }
+    if (!password || password.length < 6) {
+        showAuthMessage("Пароль должен быть не короче 6 символов");
         return false;
     }
     
-    const { data, error } = await supabase2.auth.signUp({
-        email,
-        password,
-        options: { data: { nickname } }
+    // Проверяем уникальность логина (никнейма)
+    const { data: existing } = await supabase
+        .from('profiles')
+        .select('nickname')
+        .eq('nickname', nickname)
+        .maybeSingle();
+    
+    if (existing) {
+        showAuthMessage('Логин уже занят');
+        return false;
+    }
+    
+    // Регистрируем в Supabase
+    const fakeEmail = email ? email : `${nickname}@temp.local`;
+    const { data, error } = await supabase.auth.signUp({
+        email: fakeEmail,
+        password: password,
+        options: { data: { nickname: nickname } }
     });
     
     if (error) {
@@ -546,20 +575,18 @@ async function checkAuth() {
 
 // Обработчики событий
 document.getElementById('loginBtn').onclick = async () => {
-    console.log("войти")
-    const email = document.getElementById('loginEmail').value.trim();
+    const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
-    if (await login(email, password)) {
+    if (await login(username, password)) {
         location.reload();
     }
-    console.log("выйти")
 };
 
 document.getElementById('registerBtn').onclick = async () => {
     const nickname = document.getElementById('regNickname').value.trim();
-    const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value;
-    await register(nickname, email, password);
+    const email = document.getElementById('regEmail').value.trim() || null;
+    await register(nickname, password, email);
 };
 
 document.getElementById('showRegisterBtn').onclick = showRegisterForm;

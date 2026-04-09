@@ -15,22 +15,23 @@
             <button id="closeAuthModal" class="modal-close-btn">✕</button>
         </div>
         
-        <!-- Форма входа -->
-        <div id="loginForm">
-            <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
-            <input type="password" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
-            <button id="loginBtn">Войти</button>
-            <p class="auth-switch">Нет аккаунта? <a href="#" id="showRegisterBtn">Зарегистрироваться</a></p>
-        </div>
-        
-        <!-- Форма регистрации (скрыта) -->
-        <div id="registerForm" style="display: none;">
-            <input type="text" id="regNickname" placeholder="Никнейм" maxlength="20">
-            <input type="email" id="regEmail" placeholder="Email">
-            <input type="password" id="regPassword" placeholder="Пароль (минимум 6 символов)">
-            <button id="registerBtn">Зарегистрироваться</button>
-            <p class="auth-switch">Уже есть аккаунт? <a href="#" id="showLoginBtn">Войти</a></p>
-        </div>
+<!-- Форма входа -->
+<div id="loginForm">
+    <input type="text" id="loginUsername" placeholder="Логин (никнейм)" autocomplete="username">
+    <input type="password" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
+    <button id="loginBtn">Войти</button>
+    <p class="auth-switch">Нет аккаунта? <a href="#" id="showRegisterBtn">Зарегистрироваться</a></p>
+</div>
+
+<!-- Форма регистрации -->
+<div id="registerForm" style="display: none;">
+    <input type="text" id="regNickname" placeholder="Логин (никнейм)*" maxlength="20" required>
+    <input type="password" id="regPassword" placeholder="Пароль*" required>
+    <input type="email" id="regEmail" placeholder="Email (опционально, для восстановления пароля)">
+    <div style="font-size: 11px; color: #888; margin-bottom: 12px;">Email нужен только для восстановления пароля</div>
+    <button id="registerBtn">Зарегистрироваться</button>
+    <p class="auth-switch">Уже есть аккаунт? <a href="#" id="showLoginBtn">Войти</a></p>
+</div>
         
         <div id="authMessage" class="auth-message"></div>
         
