@@ -364,9 +364,9 @@ function connect() {
     ws = new WebSocket(WS_URL);
     ws.onopen = () => {
         console.log("Соединено");
-        // if (currentUser && currentUser.nickname) {
-        //     ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
-        // }
+        if (currentUser && currentUser.nickname) {
+            ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+        }
     };
     ws.onmessage = (event) => {
         try {
