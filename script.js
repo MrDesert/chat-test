@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://ayxbdumhsgvzutmnchph.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_wIbW7rR_LRkHmG7g70_t7A_dVfzTKUp';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase2 = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 
@@ -364,9 +364,9 @@ function connect() {
     ws = new WebSocket(WS_URL);
     ws.onopen = () => {
         console.log("Соединено");
-        if (currentUser && currentUser.nickname) {
-            ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
-        }
+        // if (currentUser && currentUser.nickname) {
+        //     ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+        // }
     };
     ws.onmessage = (event) => {
         try {
@@ -455,13 +455,13 @@ function showAuthMessage(text, isError = true) {
 }
 
 async function login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase2.auth.signInWithPassword({ email, password });
     if (error) {
         showAuthMessage(error.message);
         return false;
     }
     
-    const { data: profile } = await supabase
+    const { data: profile } = await supabase2
         .from('profiles')
         .select('nickname')
         .eq('id', data.user.id)
@@ -473,7 +473,7 @@ async function login(email, password) {
         nickname: profile?.nickname || data.user.email.split('@')[0]
     };
     
-    await supabase
+    await supabase2
         .from('profiles')
         .update({ last_seen: new Date() })
         .eq('id', currentUser.id);
@@ -482,7 +482,7 @@ async function login(email, password) {
 }
 
 async function register(nickname, email, password) {
-    const { data: existing } = await supabase
+    const { data: existing } = await supabase2
         .from('profiles')
         .select('nickname')
         .eq('nickname', nickname)
@@ -493,7 +493,7 @@ async function register(nickname, email, password) {
         return false;
     }
     
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase2.auth.signUp({
         email,
         password,
         options: { data: { nickname } }
@@ -520,9 +520,9 @@ function showRegisterForm() {
 }
 
 async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase2.auth.getSession();
     if (session) {
-        const { data: profile } = await supabase
+        const { data: profile } = await supabase2
             .from('profiles')
             .select('nickname')
             .eq('id', session.user.id)
@@ -546,11 +546,13 @@ async function checkAuth() {
 
 // Обработчики событий
 document.getElementById('loginBtn').onclick = async () => {
+    console.log("войти")
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     if (await login(email, password)) {
         location.reload();
     }
+    console.log("выйти")
 };
 
 document.getElementById('registerBtn').onclick = async () => {
