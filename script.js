@@ -513,7 +513,7 @@ async function register(nickname, email, password) {
     }
     
     // Проверяем уникальность логина
-    const { data: existing } = await window.supabase
+    const { data: existing } = await window.supabase2
         .from('profiles')
         .select('nickname')
         .eq('nickname', nickname)
@@ -524,7 +524,7 @@ async function register(nickname, email, password) {
         return false;
     }
     
-    const { data, error } = await window.supabase.auth.signUp({
+    const { data, error } = await window.supabase2.auth.signUp({
         email: email,
         password: password,
         options: { data: { nickname: nickname } }
