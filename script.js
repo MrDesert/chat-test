@@ -1,10 +1,10 @@
+// ========== SUPABASE ==========
 const SUPABASE_URL = 'https://ayxbdumhsgvzutmnchph.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_wIbW7rR_LRkHmG7g70_t7A_dVfzTKUp';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
-
 
 const WS_URL = "wss://chat-test-gb86.onrender.com";
 
@@ -55,7 +55,6 @@ function renderCurrentChat() {
         chatDiv.innerHTML = publicMessages.map(msg => {
             const isOwn = (msg.nick === currentNick);
             
-            // Картинка
             if (msg.type === 'image') {
                 return `
                     <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
@@ -70,7 +69,6 @@ function renderCurrentChat() {
                 `;
             }
             
-            // Текст
             return `
                 <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
                     <div class="message ${isOwn ? 'own' : 'other'}">
@@ -97,7 +95,6 @@ function renderCurrentChat() {
     chatDiv.innerHTML = messages.map(msg => {
         const sender = msg.isOwn ? 'Вы' : msg.from;
         
-        // Картинка
         if (msg.type === 'image') {
             return `
                 <div class="message-wrapper ${msg.isOwn ? 'own' : 'other'}">
@@ -112,7 +109,6 @@ function renderCurrentChat() {
             `;
         }
         
-        // Текст
         return `
             <div class="message-wrapper ${msg.isOwn ? 'own' : 'other'}">
                 <div class="message ${msg.isOwn ? 'own' : 'other'}">
@@ -153,7 +149,6 @@ function addPrivateMessage(from, to, text, timestamp) {
 
 function addSystemMessage(text) {
     const chatDiv = document.getElementById('chat');
-    // Системные сообщения показываем только в общем чате
     if (currentChatWith !== null) return;
     
     const msgDiv = document.createElement('div');
@@ -244,7 +239,6 @@ function updateUserListUI() {
     const usersList = document.getElementById('userList');
     if (!usersList || !window.userList) return;
     
-    // Показываем ВСЕХ пользователей, включая себя
     const users = window.userList;
     
     if (users.length === 0) {
@@ -261,7 +255,6 @@ function updateUserListUI() {
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
         const isActive = (currentChatWith === name);
         
-        // Для себя — показываем без кнопки отправки
         if (isSelf) {
             return `
                 <div class="user-item ${isActive ? 'current' : ''}">
@@ -309,7 +302,6 @@ function closeCurrentChat() {
 }
 
 function sendMessage() {
-    // Отправка картинки
     if (window.pendingImage) {
         const { imageData, filename } = window.pendingImage;
         
@@ -324,13 +316,11 @@ function sendMessage() {
             sendPrivateImage(currentChatWith, imageData, filename);
         }
         
-        // Очищаем превью И сбрасываем pendingImage
         clearImagePreview();
         window.pendingImage = null;
         return;
     }
     
-    // Отправка текста
     let text = document.getElementById('message').value.trim();
     if (!text) return;
     
@@ -374,8 +364,9 @@ function connect() {
     ws = new WebSocket(WS_URL);
     ws.onopen = () => {
         console.log("Соединено");
-        // Отправляем серверу свой ник
-        ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+        if (currentUser && currentUser.nickname) {
+            ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+        }
     };
     ws.onmessage = (event) => {
         try {
@@ -421,104 +412,12 @@ function connect() {
     };
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('send').onclick = sendMessage;
-    document.getElementById('changeNickBtn').onclick = changeNick;
-    document.getElementById('closeChatBtn').onclick = closeCurrentChat;
-    document.getElementById('message').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
-    document.getElementById('nickInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') changeNick();
-    });
-    
-    // Смайлики
-    const emojiBtn = document.getElementById('emojiBtn');
-    const emojiPicker = document.getElementById('emojiPicker');
-    const messageInput = document.getElementById('message');
-    if (emojiBtn) {
-        emojiBtn.onclick = (e) => {
-            e.stopPropagation();
-            emojiPicker.classList.toggle('hidden');
-        };
-        document.addEventListener('click', (e) => {
-            if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
-                emojiPicker.classList.add('hidden');
-            }
-        });
-        document.querySelectorAll('.emoji').forEach(emoji => {
-            emoji.addEventListener('click', () => {
-                const cursorPos = messageInput.selectionStart;
-                const newText = messageInput.value.slice(0, cursorPos) + emoji.textContent + messageInput.value.slice(cursorPos);
-                messageInput.value = newText;
-                messageInput.focus();
-                const newPos = cursorPos + emoji.textContent.length;
-                messageInput.setSelectionRange(newPos, newPos);
-                emojiPicker.classList.add('hidden');
-            });
-        });
-    }
-    
-    // Модальное окно для картинок
-    const modal = document.getElementById('imageModal');
-    const modalImg = document.getElementById('modalImage');
-    if (modal) {
-        document.getElementById('chat').addEventListener('click', (e) => {
-            if (e.target.tagName === 'IMG') {
-                modal.style.display = 'block';
-                modalImg.src = e.target.src;
-            }
-        });
-        modal.onclick = () => { modal.style.display = 'none'; };
-        const closeBtn = document.querySelector('.modal-close');
-        if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
-    }
-    
-    connect();
-
-    // Отправка картинок — с предпросмотром
-const fileInput = document.getElementById('fileInput');
-if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        if (!file.type.startsWith('image/')) {
-            addErrorMessage("Можно отправлять только картинки");
-            fileInput.value = '';
-            return;
-        }
-        
-        if (file.size > 2 * 1024 * 1024) {
-            addErrorMessage("Картинка не больше 2 МБ");
-            fileInput.value = '';
-            return;
-        }
-        
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const imageData = ev.target.result;
-            const filename = file.name;
-            
-            showImagePreview(imageData, filename);
-            window.pendingImage = { imageData, filename };
-            fileInput.value = '';
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
 function showImagePreview(imageData, filename) {
     const container = document.getElementById('imagePreviewContainer');
-    if (!container) {
-        console.error("imagePreviewContainer not found");
-        return;
-    }
+    if (!container) return;
     
-    // Очищаем контейнер
     container.innerHTML = '';
     
-    // Создаём превью
     const previewDiv = document.createElement('div');
     previewDiv.className = 'image-preview';
     previewDiv.innerHTML = `
@@ -529,9 +428,8 @@ function showImagePreview(imageData, filename) {
         </div>
     `;
     
-    container.appendChild(previewDiv);  // ← используем appendChild вместо insertBefore
+    container.appendChild(previewDiv);
     
-    // Кнопка удаления
     const removeBtn = previewDiv.querySelector('.preview-remove');
     if (removeBtn) {
         removeBtn.onclick = () => {
@@ -540,6 +438,7 @@ function showImagePreview(imageData, filename) {
         };
     }
 }
+
 // ========== АВТОРИЗАЦИЯ ==========
 const authModal = document.getElementById('authModal');
 const loginForm = document.getElementById('loginForm');
@@ -562,7 +461,6 @@ async function login(email, password) {
         return false;
     }
     
-    // Получаем профиль пользователя
     const { data: profile } = await supabase
         .from('profiles')
         .select('nickname')
@@ -575,7 +473,6 @@ async function login(email, password) {
         nickname: profile?.nickname || data.user.email.split('@')[0]
     };
     
-    // Обновляем last_seen
     await supabase
         .from('profiles')
         .update({ last_seen: new Date() })
@@ -585,7 +482,6 @@ async function login(email, password) {
 }
 
 async function register(nickname, email, password) {
-    // Проверяем уникальность никнейма
     const { data: existing } = await supabase
         .from('profiles')
         .select('nickname')
@@ -642,19 +538,10 @@ async function checkAuth() {
         authModal.style.display = 'none';
         
         // Запускаем чат
-        initChat();
+        connect();
         return true;
     }
     return false;
-}
-
-async function logout() {
-    await supabase.auth.signOut();
-    currentUser = null;
-    document.body.classList.remove('authorized');
-    authModal.style.display = 'flex';
-    // Закрываем WebSocket если был
-    if (ws) ws.close();
 }
 
 // Обработчики событий
@@ -662,7 +549,7 @@ document.getElementById('loginBtn').onclick = async () => {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     if (await login(email, password)) {
-        location.reload(); // Перезагружаем для применения
+        location.reload();
     }
 };
 
@@ -681,6 +568,102 @@ document.getElementById('closeAuthModal').onclick = () => {
     setTimeout(() => { authModal.style.display = 'flex'; }, 2000);
 };
 
-// Проверяем авторизацию при загрузке
+// Добавляем кнопку гостя
+const guestBtn = document.getElementById('guestBtn');
+if (guestBtn) {
+    guestBtn.onclick = () => {
+        currentUser = {
+            id: 'guest-' + Date.now(),
+            email: null,
+            nickname: 'Гость-' + Math.floor(Math.random() * 10000)
+        };
+        document.body.classList.add('authorized');
+        authModal.style.display = 'none';
+        connect();
+    };
+}
+
+// Запускаем проверку авторизации
 checkAuth();
+
+// Обработчики интерфейса (кнопки, смайлики, картинки)
+document.getElementById('send').onclick = sendMessage;
+document.getElementById('changeNickBtn').onclick = changeNick;
+document.getElementById('closeChatBtn').onclick = closeCurrentChat;
+document.getElementById('message').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
 });
+document.getElementById('nickInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') changeNick();
+});
+
+// Смайлики
+const emojiBtn = document.getElementById('emojiBtn');
+const emojiPicker = document.getElementById('emojiPicker');
+const messageInput = document.getElementById('message');
+if (emojiBtn) {
+    emojiBtn.onclick = (e) => {
+        e.stopPropagation();
+        emojiPicker.classList.toggle('hidden');
+    };
+    document.addEventListener('click', (e) => {
+        if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
+            emojiPicker.classList.add('hidden');
+        }
+    });
+    document.querySelectorAll('.emoji').forEach(emoji => {
+        emoji.addEventListener('click', () => {
+            const cursorPos = messageInput.selectionStart;
+            const newText = messageInput.value.slice(0, cursorPos) + emoji.textContent + messageInput.value.slice(cursorPos);
+            messageInput.value = newText;
+            messageInput.focus();
+            const newPos = cursorPos + emoji.textContent.length;
+            messageInput.setSelectionRange(newPos, newPos);
+            emojiPicker.classList.add('hidden');
+        });
+    });
+}
+
+// Модальное окно для картинок
+const modal = document.getElementById('imageModal');
+const modalImg = document.getElementById('modalImage');
+if (modal) {
+    document.getElementById('chat').addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            modal.style.display = 'block';
+            modalImg.src = e.target.src;
+        }
+    });
+    modal.onclick = () => { modal.style.display = 'none'; };
+    const closeBtn = document.querySelector('.modal-close');
+    if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+}
+
+// Отправка картинок
+const fileInput = document.getElementById('fileInput');
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (!file.type.startsWith('image/')) {
+            addErrorMessage("Можно отправлять только картинки");
+            fileInput.value = '';
+            return;
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+            addErrorMessage("Картинка не больше 2 МБ");
+            fileInput.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            showImagePreview(ev.target.result, file.name);
+            window.pendingImage = { imageData: ev.target.result, filename: file.name };
+            fileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+    });
+}

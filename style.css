@@ -639,3 +639,15 @@ body.authorized .sidebar {
 body.authorized .modal-overlay {
     display: none;
 }
+
+/* Кнопка гостя */
+#guestBtn {
+    background: #6c757d;
+    width: auto !important;
+    padding: 10px 20px;
+    margin-top: 8px;
+}
+
+#guestBtn:hover {
+    background: #5a6268;
+}
