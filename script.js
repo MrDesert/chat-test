@@ -662,9 +662,6 @@ document.getElementById('closeChatBtn').onclick = closeCurrentChat;
 document.getElementById('message').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
-document.getElementById('nickInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') changeNick();
-});
 
 // Смайлики
 const emojiBtn = document.getElementById('emojiBtn');
