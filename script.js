@@ -1,4 +1,3 @@
-// ========== SUPABASE ==========
 const SUPABASE_URL = 'https://ayxbdumhsgvzutmnchph.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_wIbW7rR_LRkHmG7g70_t7A_dVfzTKUp';
 
