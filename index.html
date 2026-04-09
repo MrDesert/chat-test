@@ -7,6 +7,34 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Модальное окно авторизации -->
+<div id="authModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>💬 Вход в чат</h3>
+            <button id="closeAuthModal" class="modal-close-btn">✕</button>
+        </div>
+        
+        <!-- Форма входа -->
+        <div id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
+            <input type="password" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
+            <button id="loginBtn">Войти</button>
+            <p class="auth-switch">Нет аккаунта? <a href="#" id="showRegisterBtn">Зарегистрироваться</a></p>
+        </div>
+        
+        <!-- Форма регистрации (скрыта) -->
+        <div id="registerForm" style="display: none;">
+            <input type="text" id="regNickname" placeholder="Никнейм" maxlength="20">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="password" id="regPassword" placeholder="Пароль (минимум 6 символов)">
+            <button id="registerBtn">Зарегистрироваться</button>
+            <p class="auth-switch">Уже есть аккаунт? <a href="#" id="showLoginBtn">Войти</a></p>
+        </div>
+        
+        <div id="authMessage" class="auth-message"></div>
+    </div>
+</div>
     <div class="chat-main">
         <div class="panel-top">
             <div class="chat-header">

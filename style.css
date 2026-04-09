@@ -530,3 +530,112 @@ button, .msg-btn, .emoji-btn, .file-btn, .preview-remove, #send, #changeNickBtn,
     font-family: monospace;
     pointer-events: none; /* чтобы не мешать кликать */
 }
+
+/* Модальное окно авторизации */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-container {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    width: 320px;
+    max-width: 90%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #0066cc;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+}
+
+.modal-container input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.modal-container button {
+    width: 100%;
+    padding: 12px;
+    background: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.auth-switch {
+    text-align: center;
+    font-size: 13px;
+    margin-top: 16px;
+    color: #666;
+}
+
+.auth-switch a {
+    color: #0066cc;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.auth-message {
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.auth-message.error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.auth-message.success {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+/* Показываем чат только после авторизации */
+.chat-main, .sidebar {
+    display: none;
+}
+
+body.authorized .chat-main,
+body.authorized .sidebar {
+    display: flex;
+}
+
+body.authorized .modal-overlay {
+    display: none;
+}

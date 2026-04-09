@@ -1,3 +1,12 @@
+// ========== SUPABASE ==========
+const SUPABASE_URL = 'https://ayxbdumhsgvzutmnchph.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wIbW7rR_LRkHmG7g70_t7A_dVfzTKUp';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+
 const WS_URL = "wss://chat-test-gb86.onrender.com";
 
 let ws = null;
@@ -364,7 +373,11 @@ function changeNick() {
 
 function connect() {
     ws = new WebSocket(WS_URL);
-    ws.onopen = () => console.log("Соединено");
+    ws.onopen = () => {
+        console.log("Соединено");
+        // Отправляем серверу свой ник
+        ws.send(JSON.stringify({ type: 'nick', nick: currentUser.nickname }));
+    };
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
@@ -528,4 +541,147 @@ function showImagePreview(imageData, filename) {
         };
     }
 }
+// ========== АВТОРИЗАЦИЯ ==========
+const authModal = document.getElementById('authModal');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+const authMessage = document.getElementById('authMessage');
+
+function showAuthMessage(text, isError = true) {
+    authMessage.textContent = text;
+    authMessage.className = 'auth-message ' + (isError ? 'error' : 'success');
+    setTimeout(() => {
+        authMessage.textContent = '';
+        authMessage.className = 'auth-message';
+    }, 3000);
+}
+
+async function login(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+        showAuthMessage(error.message);
+        return false;
+    }
+    
+    // Получаем профиль пользователя
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('nickname')
+        .eq('id', data.user.id)
+        .single();
+    
+    currentUser = {
+        id: data.user.id,
+        email: data.user.email,
+        nickname: profile?.nickname || data.user.email.split('@')[0]
+    };
+    
+    // Обновляем last_seen
+    await supabase
+        .from('profiles')
+        .update({ last_seen: new Date() })
+        .eq('id', currentUser.id);
+    
+    return true;
+}
+
+async function register(nickname, email, password) {
+    // Проверяем уникальность никнейма
+    const { data: existing } = await supabase
+        .from('profiles')
+        .select('nickname')
+        .eq('nickname', nickname)
+        .single();
+    
+    if (existing) {
+        showAuthMessage('Никнейм уже занят');
+        return false;
+    }
+    
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { nickname } }
+    });
+    
+    if (error) {
+        showAuthMessage(error.message);
+        return false;
+    }
+    
+    showAuthMessage('Регистрация успешна! Теперь войдите', false);
+    showLoginForm();
+    return false;
+}
+
+function showLoginForm() {
+    loginForm.style.display = 'block';
+    registerForm.style.display = 'none';
+}
+
+function showRegisterForm() {
+    loginForm.style.display = 'none';
+    registerForm.style.display = 'block';
+}
+
+async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('nickname')
+            .eq('id', session.user.id)
+            .single();
+        
+        currentUser = {
+            id: session.user.id,
+            email: session.user.email,
+            nickname: profile?.nickname || session.user.email.split('@')[0]
+        };
+        
+        document.body.classList.add('authorized');
+        authModal.style.display = 'none';
+        
+        // Запускаем чат
+        initChat();
+        return true;
+    }
+    return false;
+}
+
+async function logout() {
+    await supabase.auth.signOut();
+    currentUser = null;
+    document.body.classList.remove('authorized');
+    authModal.style.display = 'flex';
+    // Закрываем WebSocket если был
+    if (ws) ws.close();
+}
+
+// Обработчики событий
+document.getElementById('loginBtn').onclick = async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (await login(email, password)) {
+        location.reload(); // Перезагружаем для применения
+    }
+};
+
+document.getElementById('registerBtn').onclick = async () => {
+    const nickname = document.getElementById('regNickname').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    await register(nickname, email, password);
+};
+
+document.getElementById('showRegisterBtn').onclick = showRegisterForm;
+document.getElementById('showLoginBtn').onclick = showLoginForm;
+document.getElementById('closeAuthModal').onclick = () => {
+    authModal.style.display = 'none';
+    showAuthMessage('Без авторизации чат не работает', true);
+    setTimeout(() => { authModal.style.display = 'flex'; }, 2000);
+};
+
+// Проверяем авторизацию при загрузке
+checkAuth();
 });
