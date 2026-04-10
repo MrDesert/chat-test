@@ -463,34 +463,45 @@ function showAuthMessage(text, isError = true) {
     }, 3000);
 }
 
-async function login(username, password) {
-    // Сначала находим email пользователя по логину
-    const { data: profile } = await supabase2
-        .from('profiles')
-        .select('id')
-        .eq('nickname', username)
-        .maybeSingle();
+async function login() {
+    const loginInput = document.getElementById('loginEmail').value.trim().toLowerCase();
+    const password = document.getElementById('loginPassword').value;
     
-    if (!profile) {
-        showAuthMessage('Логин не найден');
+    if (!loginInput || !password) {
+        showAuthMessage('Введите логин/email и пароль');
         return false;
     }
     
-    // Получаем email пользователя из auth.users
-    const { data: userData } = await supabase2
-        .from('users')
-        .select('email')
-        .eq('id', profile.id)
-        .maybeSingle();
+    // Определяем, что ввёл пользователь: email или логин
+    let email = loginInput;
+    let nickname = null;
     
-    if (!userData || !userData.email) {
-        showAuthMessage('Ошибка: у пользователя нет email');
+    // Если это не похоже на email (нет @), то ищем по nickname
+    if (!loginInput.includes('@')) {
+        nickname = loginInput;
+        
+        // Ищем email по nickname в таблице profiles
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('nickname', nickname)
+            .single();
+        
+        if (profileError || !profile) {
+            showAuthMessage('Пользователь с таким логином не найден');
+            return false;
+        }
+        
+        // Получаем email пользователя через auth.admin (нельзя из клиента)
+        // Поэтому проще: при регистрации сохраняем email в profiles
+        showAuthMessage('Используйте email для входа, либо мы донастроим вход по логину');
         return false;
     }
     
-    const { data, error } = await supabase2.auth.signInWithPassword({
-        email: userData.email,
-        password: password
+    // Вход по email
+    const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email, 
+        password: password 
     });
     
     if (error) {
@@ -498,21 +509,37 @@ async function login(username, password) {
         return false;
     }
     
-    currentUser = {
-        id: data.user.id,
-        email: data.user.email,
-        nickname: username
-    };
-    
-    return true;
+    if (data.user) {
+        // Получаем nickname из profiles
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('nickname')
+            .eq('id', data.user.id)
+            .single();
+        
+        currentUser = {
+            id: data.user.id,
+            email: data.user.email,
+            nickname: profile?.nickname || data.user.email.split('@')[0]
+        };
+        
+        await supabase
+            .from('profiles')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('id', currentUser.id);
+        
+        document.body.classList.add('authorized');
+        authModal.style.display = 'none';
+        connect();
+        return true;
+    }
+    return false;
 }
 
 async function register() {
     const nickname = document.getElementById('regNickname').value.trim();
-    const email = document.getElementById('regEmail').value.trim();
+    const email = document.getElementById('regEmail').value.trim().toLowerCase();
     const password = document.getElementById('regPassword').value;
-    
-    console.log("Попытка регистрации:", { nickname, email, passwordLength: password?.length });
     
     if (!nickname || !email || !password) {
         showAuthMessage('Заполните все поля');
@@ -524,31 +551,9 @@ async function register() {
         return;
     }
     
-    // Приводим email к нижнему регистру
-    const normalizedEmail = email.toLowerCase();
-    
-    // Простая проверка формата email
-    if (!normalizedEmail.includes('@') || !normalizedEmail.includes('.')) {
-        showAuthMessage('Введите корректный email');
-        return;
-    }
-    
-    // Проверяем уникальность никнейма
-    const { data: existing, error: checkError } = await supabase2
-        .from('profiles')
-        .select('nickname')
-        .eq('nickname', nickname)
-        .maybeSingle();
-    
-    // Если есть пользователь с таким ником (и это не ошибка "нет данных")
-    if (existing) {
-        showAuthMessage('Никнейм уже занят');
-        return;
-    }
-    
     // Регистрация
-    const { data, error } = await supabase2.auth.signUp({
-        email: normalizedEmail,
+    const { data, error } = await supabase.auth.signUp({
+        email: email,
         password: password,
         options: { 
             data: { nickname: nickname }
@@ -556,16 +561,23 @@ async function register() {
     });
     
     if (error) {
-        console.error("SignUp error:", error);
         showAuthMessage(error.message);
         return;
     }
     
     if (data.user) {
+        // Ждём создания профиля триггером (или создаём сами)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Дополнительно сохраняем email в profiles (на случай если триггер не сработал)
+        await supabase
+            .from('profiles')
+            .update({ email: email })
+            .eq('id', data.user.id);
+        
         showAuthMessage('Регистрация успешна! Подтвердите Email (письмо от Supabase Auth)', false);
         showLoginForm();
         
-        // Очищаем поля
         document.getElementById('regNickname').value = '';
         document.getElementById('regEmail').value = '';
         document.getElementById('regPassword').value = '';
