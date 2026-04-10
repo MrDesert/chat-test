@@ -18,6 +18,7 @@ let msgCounter = 0;
 let isVerifiedUser = false;  // true — авторизован по логину/паролю
 let typingTimeout = null;
 let lastTypingSent = 0;
+let isCurrentlyTyping = false;
 
 function formatTimestamp(timestamp) {
     const diff = Date.now() - timestamp;
@@ -342,6 +343,14 @@ function sendMessage() {
     }
     
     document.getElementById('message').value = '';
+
+const originalSendMessage = sendMessage;
+sendMessage = function() {
+    if (typingTimeout) clearTimeout(typingTimeout);
+    sendTyping(false);
+    isCurrentlyTyping = false;
+    return originalSendMessage.apply(this, arguments);
+};
 }
 
 function sendTyping(isTyping) {
@@ -726,32 +735,41 @@ const emojiPicker = document.getElementById('emojiPicker');
 const messageInput = document.getElementById('message');
 
 if (messageInput) {
-    let oldValue = '';
+
+    
     messageInput.addEventListener('input', () => {
         const hasText = messageInput.value.trim().length > 0;
-        if (hasText && oldValue === '') {
+        
+        if (hasText && !isCurrentlyTyping) {
             // Начал печатать
+            isCurrentlyTyping = true;
             sendTyping(true);
+            
+            // Сбрасываем таймер, если был
+            if (typingTimeout) clearTimeout(typingTimeout);
+            
+            // Через 2 секунды бездействия сбрасываем статус
+            typingTimeout = setTimeout(() => {
+                sendTyping(false);
+                isCurrentlyTyping = false;
+                typingTimeout = null;
+            }, 2000);
+        } else if (!hasText && isCurrentlyTyping) {
+            // Стёр всё — сразу сбрасываем
+            sendTyping(false);
+            isCurrentlyTyping = false;
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = null;
+        } else if (hasText && isCurrentlyTyping) {
+            // Продолжает печатать — сбрасываем таймер и запускаем заново
             if (typingTimeout) clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
                 sendTyping(false);
-            }, 1500);
-        } else if (!hasText && oldValue !== '') {
-            // Стёр всё
-            sendTyping(false);
-            if (typingTimeout) clearTimeout(typingTimeout);
+                isCurrentlyTyping = false;
+                typingTimeout = null;
+            }, 2000);
         }
-        oldValue = messageInput.value;
     });
-    
-    // При отправке сообщения сбрасываем статус печати
-    const originalSendMessage = sendMessage;
-    window.sendMessage = sendMessage;
-    sendMessage = function() {
-        if (typingTimeout) clearTimeout(typingTimeout);
-        sendTyping(false);
-        return originalSendMessage.apply(this, arguments);
-    };
 }
 
 if (emojiBtn) {
