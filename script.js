@@ -126,28 +126,20 @@ function renderCurrentChat() {
 }
 
 function addPublicMessage(nick, text, timestamp, skipSave = false) {
-    if (!skipSave) {
-        saveMessage('public', nick, null, 'text', text, null);
-    }
+    // НЕ СОХРАНЯЕМ ЗДЕСЬ БОЛЬШЕ НИКОГДА
     publicMessages.push({ nick, text, timestamp, id: msgCounter++ });
     if (currentChatWith === null) renderCurrentChat();
 }
 
 function addPrivateMessage(from, to, text, timestamp, skipSave = false) {
-    const room = [from, to].sort().join('_');
-    if (!skipSave) {
-        saveMessage(room, from, to, 'text', text, null);
-    }
-    
+    // НЕ СОХРАНЯЕМ ЗДЕСЬ БОЛЬШЕ НИКОГДА
     const other = (from === currentNick) ? to : from;
     if (!privateMessages[other]) privateMessages[other] = [];
-    
     privateMessages[other].push({
         from, to, text, timestamp,
         isOwn: (from === currentNick),
         id: msgCounter++
     });
-    
     if (currentChatWith === other) {
         renderCurrentChat();
     } else {
@@ -321,12 +313,21 @@ function closeCurrentChat() {
 }
 
 function sendMessage() {
+    // Отправка картинки
     if (window.pendingImage) {
         const { imageData, filename } = window.pendingImage;
         
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             addErrorMessage("Нет соединения с сервером");
             return;
+        }
+        
+        // Сохраняем в БД
+        if (currentChatWith === null) {
+            saveMessage('public', currentNick, null, 'image', imageData, filename);
+        } else {
+            const room = [currentNick, currentChatWith].sort().join('_');
+            saveMessage(room, currentNick, currentChatWith, 'image', imageData, filename);
         }
         
         if (currentChatWith === null) {
@@ -340,6 +341,7 @@ function sendMessage() {
         return;
     }
     
+    // Отправка текста
     let text = document.getElementById('message').value.trim();
     if (!text) return;
     
@@ -348,6 +350,15 @@ function sendMessage() {
         return;
     }
     
+    // Сохраняем в БД
+    if (currentChatWith === null) {
+        saveMessage('public', currentNick, null, 'text', text, null);
+    } else {
+        const room = [currentNick, currentChatWith].sort().join('_');
+        saveMessage(room, currentNick, currentChatWith, 'text', text, null);
+    }
+    
+    // Отправляем через WebSocket
     if (currentChatWith === null) {
         ws.send(JSON.stringify({ type: 'public', text: text }));
     } else {
@@ -355,14 +366,11 @@ function sendMessage() {
     }
     
     document.getElementById('message').value = '';
-
-const originalSendMessage = sendMessage;
-sendMessage = function() {
+    
+    // Сброс печати
     if (typingTimeout) clearTimeout(typingTimeout);
     sendTyping(false);
     isCurrentlyTyping = false;
-    return originalSendMessage.apply(this, arguments);
-};
 }
 
 function sendTyping(isTyping) {
