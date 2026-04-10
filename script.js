@@ -239,7 +239,15 @@ function addPrivateImage(from, to, imageData, filename, timestamp, skipSave = fa
 
 function updateUserListUI() {
     const usersList = document.getElementById('userList');
-    if (!usersList || !window.userList) return;
+    if (!usersList) return;
+    
+    // Проверяем, что window.userList — массив
+    if (!window.userList || !Array.isArray(window.userList)) {
+        console.warn("window.userList не массив или отсутствует", window.userList);
+        usersList.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">Загрузка...</div>';
+        document.getElementById('onlineCount').innerText = '0 человек';
+        return;
+    }
     
     const users = window.userList;
     
@@ -452,7 +460,13 @@ else if (data.type === 'history') {
     }
 }
 else if (data.type === 'user_list') {
-    window.userList = data.users;  // data.users уже массив объектов {name, isVerified}
+    // Убеждаемся, что data.users — это массив
+    if (Array.isArray(data.users)) {
+        window.userList = data.users;
+    } else {
+        console.warn("user_list не массив:", data.users);
+        window.userList = [];
+    }
     updateUserListUI();
 }
             else if (data.type === 'system') {
