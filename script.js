@@ -475,7 +475,7 @@ async function login() {
     // Определяем, что ввёл пользователь: email или логин
     let email = loginInput;
     let nickname = null;
-    
+    console.log(email);
     // Если это не похоже на email (нет @), то ищем по nickname
     if (!loginInput.includes('@')) {
         nickname = loginInput;
@@ -483,20 +483,20 @@ async function login() {
         // Ищем email по nickname в таблице profiles
         const { data: profile, error: profileError } = await supabase2
             .from('profiles')
-            .select('id')
+            .select('email')
             .eq('nickname', nickname)
             .single();
         
-        if (profileError || !profile) {
-            showAuthMessage('Пользователь с таким логином не найден');
-            return false;
-        }
+        // if (profileError || !profile || !profile.email) {
+        //     showAuthMessage('Пользователь с таким логином не найден');
+        //     return false;
+        // }
         
-        // Получаем email пользователя через auth.admin (нельзя из клиента)
-        // Поэтому проще: при регистрации сохраняем email в profiles
-        showAuthMessage('Используйте email для входа, либо мы донастроим вход по логину');
-        return false;
+        // Берём email из найденного профиля
+        email = profile.email;
+        console.log(email);
     }
+    console.log(email);
     
     // Вход по email
     const { data, error } = await supabase2.auth.signInWithPassword({ 
