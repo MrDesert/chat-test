@@ -481,7 +481,7 @@ async function login() {
         nickname = loginInput;
         
         // Ищем email по nickname в таблице profiles
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase2
             .from('profiles')
             .select('id')
             .eq('nickname', nickname)
