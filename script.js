@@ -126,6 +126,9 @@ function renderCurrentChat() {
 }
 
 function addPublicMessage(nick, text, timestamp) {
+    if (save) {
+        saveMessage('public', nick, null, 'text', text, null);
+    }
     publicMessages.push({ nick, text, timestamp, id: msgCounter++ });
     if (currentChatWith === null) {
         renderCurrentChat();
@@ -133,6 +136,10 @@ function addPublicMessage(nick, text, timestamp) {
 }
 
 function addPrivateMessage(from, to, text, timestamp) {
+        const room = [from, to].sort().join('_');
+    if (save) {
+        saveMessage(room, from, to, 'text', text, null);
+    }
     const other = (from === currentNick) ? to : from;
     if (!privateMessages[other]) privateMessages[other] = [];
     
@@ -260,7 +267,7 @@ function updateUserListUI() {
         const unread = unreadCount[name] || 0;
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
         const isActive = (currentChatWith === name);
-        const verifiedBadge = isVerified ? '<span style="margin-left: 4px; font-size: 12px;">✅</span>' : '';
+        const verifiedBadge = isVerified ? '<span style="margin-left: 4px; font-size: 12px;">✔</span>' : '';
         
         if (isSelf) {
             return `
@@ -412,6 +419,16 @@ ws.onopen = () => {
                 currentNick = data.nick;
                 document.getElementById('nickInfo').innerText = currentNick;
             }
+            else if (data.type === 'history') {
+    data.messages.forEach(msg => {
+        if (msg.room === 'public') {
+            addPublicMessage(msg.from_nick, msg.content, new Date(msg.created_at).getTime(), false);
+        } else if (msg.to_nick === currentNick || msg.from_nick === currentNick) {
+            const other = msg.from_nick === currentNick ? msg.to_nick : msg.from_nick;
+            addPrivateMessage(msg.from_nick, msg.to_nick, msg.content, new Date(msg.created_at).getTime(), false);
+        }
+    });
+}
             else if (data.type === 'public') {
                 addPublicMessage(data.nick, data.text, data.timestamp);
             }
@@ -767,7 +784,7 @@ if (messageInput) {
                 sendTyping(false);
                 isCurrentlyTyping = false;
                 typingTimeout = null;
-            }, 2000);
+            }, 100);
         }
     });
 }
@@ -897,5 +914,22 @@ function showTypingIndicator(from) {
     if (typingIndicatorTimeout) clearTimeout(typingIndicatorTimeout);
     typingIndicatorTimeout = setTimeout(() => {
         if (indicator) indicator.style.display = 'none';
-    }, 3000);
+    }, 1000);
+}
+
+async function saveMessage(room, from_nick, to_nick, type, content, filename) {
+    try {
+        await supabase2
+            .from('messages')
+            .insert([{
+                room: room,
+                from_nick: from_nick,
+                to_nick: to_nick || null,
+                type: type,
+                content: content,
+                filename: filename || null
+            }]);
+    } catch(e) {
+        console.error('Save message error:', e);
+    }
 }

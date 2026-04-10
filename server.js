@@ -1,5 +1,9 @@
 const WebSocket = require('ws');
 const server = new WebSocket.Server({ port: process.env.PORT || 8080 });
+const fetch = require('node-fetch');
+
+const SUPABASE_URL = 'https://ayxbdumhsgvzutmnchph.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wIbW7rR_LRkHmG7g70_t7A_dVfzTKUp';
 
 let clients = [];
 let nextId = 1;
@@ -47,12 +51,29 @@ function sendToUser(toName, data) {
     }
 }
 
-server.on('connection', (ws) => {
+server.on('connection', async (ws) => {
     const guestName = `Гость-${nextId++}`;
     const client = { ws, name: guestName };
     clients.push(client);
 
     ws.send(JSON.stringify({ type: 'init', nick: guestName }));
+
+    // Загружаем последние 50 сообщений из Supabase
+try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/messages?select=*&order=created_at.desc&limit=50`, {
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+    });
+    const messages = await response.json();
+    ws.send(JSON.stringify({
+        type: 'history',
+        messages: messages.reverse() // в хронологическом порядке
+    }));
+} catch(e) {
+    console.error('History load error:', e);
+}
     
     // Оповещаем всех о новом пользователе
     broadcastSystemMessage(`${guestName} присоединился к чату`);
