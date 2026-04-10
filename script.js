@@ -499,7 +499,7 @@ async function login() {
     }
     
     // Вход по email
-    const { data, error } = await supabase.auth.signInWithPassword({ 
+    const { data, error } = await supabase2.auth.signInWithPassword({ 
         email: email, 
         password: password 
     });
@@ -511,7 +511,7 @@ async function login() {
     
     if (data.user) {
         // Получаем nickname из profiles
-        const { data: profile } = await supabase
+        const { data: profile } = await supabase2
             .from('profiles')
             .select('nickname')
             .eq('id', data.user.id)
@@ -523,7 +523,7 @@ async function login() {
             nickname: profile?.nickname || data.user.email.split('@')[0]
         };
         
-        await supabase
+        await supabase2
             .from('profiles')
             .update({ last_seen: new Date().toISOString() })
             .eq('id', currentUser.id);
@@ -552,7 +552,7 @@ async function register() {
     }
     
     // Регистрация
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase2.auth.signUp({
         email: email,
         password: password,
         options: { 
@@ -570,7 +570,7 @@ async function register() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Дополнительно сохраняем email в profiles (на случай если триггер не сработал)
-        await supabase
+        await supabase2
             .from('profiles')
             .update({ email: email })
             .eq('id', data.user.id);
