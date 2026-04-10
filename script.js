@@ -475,28 +475,25 @@ async function login() {
     // Определяем, что ввёл пользователь: email или логин
     let email = loginInput;
     let nickname = null;
-    console.log(email);
     // Если это не похоже на email (нет @), то ищем по nickname
     if (!loginInput.includes('@')) {
         nickname = loginInput;
         
         // Ищем email по nickname в таблице profiles
-        const { data: profile, error: profileError } = await supabase2
-            .from('profiles')
-            .select('email')
-            .eq('nickname', nickname)
-            .single();
+const { data: profile, error: profileError } = await supabase2
+    .from('profiles')
+    .select('email')
+    .ilike('nickname', nickname)  // ← ilike игнорирует регистр
+    .single();
         
-        // if (profileError || !profile || !profile.email) {
-        //     showAuthMessage('Пользователь с таким логином не найден');
-        //     return false;
-        // }
+        if (profileError || !profile || !profile.email) {
+            showAuthMessage('Пользователь с таким логином не найден');
+            return false;
+        }
         
         // Берём email из найденного профиля
         email = profile.email;
-        console.log(email);
     }
-    console.log(email);
     
     // Вход по email
     const { data, error } = await supabase2.auth.signInWithPassword({ 
@@ -678,6 +675,8 @@ if (guestBtn) {
         };
         document.body.classList.add('authorized');
         authModal.style.display = 'none';
+        document.getElementById("nickInput").hidden = false;
+        document.getElementById("changeNickBtn").hidden = false;
         connect();
     };
 }
@@ -762,4 +761,44 @@ if (fileInput) {
         };
         reader.readAsDataURL(file);
     });
+
+}
+    async function logout() {
+    // Закрываем WebSocket соединение
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+    }
+    ws = null;
+    
+    // Выходим из Supabase
+    await supabase2.auth.signOut();
+    
+    // Очищаем данные пользователя
+    currentUser = null;
+    currentNick = "";
+    currentChatWith = null;
+    publicMessages = [];
+    privateMessages = {};
+    unreadCount = {};
+    
+    // Показываем окно авторизации
+    document.body.classList.remove('authorized');
+    authModal.style.display = 'flex';
+    
+    // Очищаем поля ввода
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+
+    document.getElementById("nickInput").hidden = true;
+    document.getElementById("changeNickBtn").hidden = true;
+    
+    // Очищаем чат
+    document.getElementById('chat').innerHTML = '<div class="placeholder">👈 Войдите, чтобы начать общение</div>';
+    document.getElementById('userList').innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">Загрузка...</div>';
+}
+
+// Кнопка выхода
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) {
+    logoutBtn.onclick = logout;
 }
