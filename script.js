@@ -638,11 +638,11 @@ document.getElementById('registerBtn').onclick = async () => {
 
 document.getElementById('showRegisterBtn').onclick = showRegisterForm;
 document.getElementById('showLoginBtn').onclick = showLoginForm;
-document.getElementById('closeAuthModal').onclick = () => {
-    authModal.style.display = 'none';
-    showAuthMessage('Без авторизации чат не работает', true);
-    setTimeout(() => { authModal.style.display = 'flex'; }, 2000);
-};
+// document.getElementById('closeAuthModal').onclick = () => {
+//     authModal.style.display = 'none';
+//     showAuthMessage('Без авторизации чат не работает', true);
+//     setTimeout(() => { authModal.style.display = 'flex'; }, 2000);
+// };
 
 // Добавляем кнопку гостя
 const guestBtn = document.getElementById('guestBtn');
