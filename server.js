@@ -73,6 +73,21 @@ server.on('connection', (ws) => {
                 broadcastUserList(); // обновляем список для всех
                 return;
             }
+            // === ПЕЧАТАЕТ ===
+            if (data.type === 'typing') {
+            // Рассылаем всем, кроме отправителя
+                clients.forEach(c => {
+                if (c.ws !== ws && c.ws.readyState === WebSocket.OPEN) {
+                    c.ws.send(JSON.stringify({
+                        type: 'typing',
+                        from: sender.name,
+                        to: data.to || null, // для ЛС
+                        isTyping: data.isTyping
+                    }));
+                }
+            });
+            return;
+            }
             // === ОБЩИЙ ЧАТ ===
             if (data.type === 'public') {
                 const message = {

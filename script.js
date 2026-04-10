@@ -16,6 +16,8 @@ let privateMessages = {};
 let unreadCount = {};
 let msgCounter = 0;
 let isVerifiedUser = false;  // true — авторизован по логину/паролю
+let typingTimeout = null;
+let lastTypingSent = 0;
 
 function formatTimestamp(timestamp) {
     const diff = Date.now() - timestamp;
@@ -250,19 +252,20 @@ function updateUserListUI() {
     
     document.getElementById('onlineCount').innerText = `${users.length} ${users.length === 1 ? 'человек' : 'человек'}`;
     
-    usersList.innerHTML = users.map(name => {
+    usersList.innerHTML = users.map(user => {
+        const name = user.name;
+        const isVerified = user.isVerified === true;
         const isSelf = (name === currentNick);
         const unread = unreadCount[name] || 0;
         const unreadBadge = unread > 0 ? `<span class="unread-badge">${unread}</span>` : '';
         const isActive = (currentChatWith === name);
-            // Проверяем, авторизован ли пользователь (нужно хранить список)
-const isUserVerified = window.verifiedUsers && window.verifiedUsers.includes(name);
-const verifiedBadge = isUserVerified ? '<span class="verified">✅</span>' : '';
+        const verifiedBadge = isVerified ? '<span style="margin-left: 4px; font-size: 12px;">✅</span>' : '';
+        
         if (isSelf) {
             return `
                 <div class="user-item ${isActive ? 'current' : ''}">
                     <span class="status"></span>
-                    <span class="name">${escapeHtml(name)} (вы)</span>
+                    <span class="name">${escapeHtml(name)} (вы)${verifiedBadge}</span>
                 </div>
             `;
         }
@@ -270,7 +273,7 @@ const verifiedBadge = isUserVerified ? '<span class="verified">✅</span>' : '';
         return `
             <div class="user-item ${isActive ? 'current' : ''}">
                 <span class="status"></span>
-                <span class="name">${escapeHtml(name)}</span>
+                <span class="name">${escapeHtml(name)}${verifiedBadge}</span>
                 <button class="msg-btn" data-user="${escapeHtml(name)}">✉️ ${unreadBadge}</button>
             </div>
         `;
@@ -341,6 +344,22 @@ function sendMessage() {
     document.getElementById('message').value = '';
 }
 
+function sendTyping(isTyping) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!currentUser) return;
+    
+    const now = Date.now();
+    // Не чаще раза в 2 секунды
+    if (isTyping && now - lastTypingSent < 2000) return;
+    
+    lastTypingSent = now;
+    ws.send(JSON.stringify({
+        type: 'typing',
+        isTyping: isTyping,
+        to: currentChatWith  // для ЛС передаём собеседника
+    }));
+}
+
 function clearImagePreview() {
     const container = document.getElementById('imagePreviewContainer');
     if (container) {
@@ -390,9 +409,18 @@ ws.onopen = () => {
             else if (data.type === 'private') {
                 addPrivateMessage(data.from, data.to, data.text, data.timestamp);
             }
+            else if (data.type === 'typing') {
+    // Показываем только если это активный чат (общий или ЛС с этим человеком)
+    if (data.to === null && currentChatWith === null) {
+        showTypingIndicator(data.from);
+    } else if (data.to !== null && data.from === currentChatWith) {
+        showTypingIndicator(data.from);
+    } else if (data.to !== null && data.to === currentNick && currentChatWith === data.from) {
+        showTypingIndicator(data.from);
+    }
+}
 else if (data.type === 'user_list') {
-    window.userList = data.users.map(u => u.name);
-    window.verifiedUsers = data.users.filter(u => u.isVerified).map(u => u.name);
+    window.userList = data.users;  // data.users уже массив объектов {name, isVerified}
     updateUserListUI();
 }
             else if (data.type === 'system') {
@@ -696,6 +724,36 @@ document.getElementById('message').addEventListener('keypress', (e) => {
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 const messageInput = document.getElementById('message');
+
+if (messageInput) {
+    let oldValue = '';
+    messageInput.addEventListener('input', () => {
+        const hasText = messageInput.value.trim().length > 0;
+        if (hasText && oldValue === '') {
+            // Начал печатать
+            sendTyping(true);
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                sendTyping(false);
+            }, 1500);
+        } else if (!hasText && oldValue !== '') {
+            // Стёр всё
+            sendTyping(false);
+            if (typingTimeout) clearTimeout(typingTimeout);
+        }
+        oldValue = messageInput.value;
+    });
+    
+    // При отправке сообщения сбрасываем статус печати
+    const originalSendMessage = sendMessage;
+    window.sendMessage = sendMessage;
+    sendMessage = function() {
+        if (typingTimeout) clearTimeout(typingTimeout);
+        sendTyping(false);
+        return originalSendMessage.apply(this, arguments);
+    };
+}
+
 if (emojiBtn) {
     emojiBtn.onclick = (e) => {
         e.stopPropagation();
@@ -801,4 +859,25 @@ if (fileInput) {
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) {
     logoutBtn.onclick = logout;
+}
+
+let typingIndicatorTimeout = null;
+
+function showTypingIndicator(from) {
+    let indicator = document.getElementById('typingIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'typingIndicator';
+        indicator.className = 'typing-indicator';
+        const panel = document.querySelector('.panel');
+        panel.parentNode.insertBefore(indicator, panel);
+    }
+    
+    indicator.innerHTML = `✏️ ${escapeHtml(from)} печатает...`;
+    indicator.style.display = 'block';
+    
+    if (typingIndicatorTimeout) clearTimeout(typingIndicatorTimeout);
+    typingIndicatorTimeout = setTimeout(() => {
+        if (indicator) indicator.style.display = 'none';
+    }, 3000);
 }
