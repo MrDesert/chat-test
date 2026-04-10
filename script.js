@@ -521,32 +521,39 @@ async function register(nickname, email, password) {
         return false;
     }
     
-    // Проверяем уникальность логина
-    const { data: existing } = await supabase2
-        .from('profiles')
-        .select('nickname')
-        .eq('nickname', nickname)
-        .maybeSingle();
-    
-    if (existing) {
-        showAuthMessage('Логин уже занят');
-        return false;
-    }
-    
-    const { data, error } = await supabase2.auth.signUp({
-        email: email,
-        password: password,
-        options: { data: { nickname: nickname } }
-    });
-    
-    if (error) {
-        showAuthMessage(error.message);
-        return false;
-    }
-    
-    showAuthMessage('Регистрация успешна! Проверьте почту для подтверждения', false);
-    showLoginForm();
+// Проверяем уникальность никнейма
+const { data: existing, error: checkError } = await supabase2
+    .from('profiles')
+    .select('nickname')
+    .eq('nickname', nickname)
+    .single();
+
+// Если ошибка не "not found" — значит есть другой пользователь
+if (existing) {
+    showAuthMessage('Никнейм уже занят');
     return false;
+}
+
+// Регистрация
+const { data, error } = await supabase2.auth.signUp({
+    email: email,
+    password: password,
+    options: { 
+        data: { nickname: nickname }  // передаём nickname в метаданные
+    }
+});
+
+if (error) {
+    console.error("SignUp error:", error);
+    showAuthMessage(error.message);
+    return false;
+}
+
+if (data.user) {
+    showAuthMessage('Регистрация успешна! Теперь войдите', false);
+    showLoginForm();
+    return true;
+}
 }
 
 function showLoginForm() {
