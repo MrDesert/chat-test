@@ -507,53 +507,69 @@ async function login(username, password) {
     return true;
 }
 
-async function register(nickname, email, password) {
-    if (!nickname || nickname.length < 3) {
-        showAuthMessage("Логин должен быть не короче 3 символов");
-        return false;
-    }
-    if (!email) {
-        showAuthMessage("Email обязателен");
-        return false;
-    }
-    if (!password || password.length < 6) {
-        showAuthMessage("Пароль должен быть не короче 6 символов");
-        return false;
+async function register() {
+    const nickname = document.getElementById('regNickname').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    
+    console.log("Попытка регистрации:", { nickname, email, passwordLength: password?.length });
+    
+    if (!nickname || !email || !password) {
+        showAuthMessage('Заполните все поля');
+        return;
     }
     
-// Проверяем уникальность никнейма
-const { data: existing, error: checkError } = await supabase2
-    .from('profiles')
-    .select('nickname')
-    .eq('nickname', nickname)
-    .single();
-
-// Если ошибка не "not found" — значит есть другой пользователь
-if (existing) {
-    showAuthMessage('Никнейм уже занят');
-    return false;
-}
-
-// Регистрация
-const { data, error } = await supabase2.auth.signUp({
-    email: email,
-    password: password,
-    options: { 
-        data: { nickname: nickname }  // передаём nickname в метаданные
+    if (password.length < 6) {
+        showAuthMessage('Пароль должен быть минимум 6 символов');
+        return;
     }
-});
-
-if (error) {
-    console.error("SignUp error:", error);
-    showAuthMessage(error.message);
-    return false;
-}
-
-if (data.user) {
-    showAuthMessage('Регистрация успешна! Теперь войдите', false);
-    showLoginForm();
-    return true;
-}
+    
+    // Приводим email к нижнему регистру
+    const normalizedEmail = email.toLowerCase();
+    
+    // Простая проверка формата email
+    if (!normalizedEmail.includes('@') || !normalizedEmail.includes('.')) {
+        showAuthMessage('Введите корректный email');
+        return;
+    }
+    
+    // Проверяем уникальность никнейма
+    const { data: existing, error: checkError } = await supabase2
+        .from('profiles')
+        .select('nickname')
+        .eq('nickname', nickname)
+        .maybeSingle();
+    
+    // Если есть пользователь с таким ником (и это не ошибка "нет данных")
+    if (existing) {
+        showAuthMessage('Никнейм уже занят');
+        return;
+    }
+    
+    // Регистрация
+    const { data, error } = await supabase2.auth.signUp({
+        email: normalizedEmail,
+        password: password,
+        options: { 
+            data: { nickname: nickname }
+        }
+    });
+    
+    if (error) {
+        console.error("SignUp error:", error);
+        showAuthMessage(error.message);
+        return;
+    }
+    
+    if (data.user) {
+        showAuthMessage('Регистрация успешна! Подтвердите Email (письмо от Supabase Auth)', false);
+        showLoginForm();
+        
+        // Очищаем поля
+        document.getElementById('regNickname').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regPassword').value = '';
+    }
 }
 
 function showLoginForm() {
@@ -629,12 +645,7 @@ document.getElementById('loginBtn').onclick = async () => {
     }
 };
 
-document.getElementById('registerBtn').onclick = async () => {
-    const nickname = document.getElementById('regNickname').value.trim();
-    const password = document.getElementById('regPassword').value;
-    const email = document.getElementById('regEmail').value.trim() || null;
-    await register(nickname, password, email);
-};
+document.getElementById('registerBtn').onclick = register;
 
 document.getElementById('showRegisterBtn').onclick = showRegisterForm;
 document.getElementById('showLoginBtn').onclick = showLoginForm;
