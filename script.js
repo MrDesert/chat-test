@@ -650,7 +650,7 @@ document.getElementById('guestBtn').onclick = () => {
 
 // Обработчики событий
 document.getElementById('loginBtn').onclick = async () => {
-    const username = document.getElementById('loginUsername').value.trim();
+    const username = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     if (await login(username, password)) {
         location.reload();
