@@ -125,21 +125,20 @@ function renderCurrentChat() {
     chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-function addPublicMessage(nick, text, timestamp) {
-    if (save) {
+function addPublicMessage(nick, text, timestamp, skipSave = false) {
+    if (!skipSave) {
         saveMessage('public', nick, null, 'text', text, null);
     }
     publicMessages.push({ nick, text, timestamp, id: msgCounter++ });
-    if (currentChatWith === null) {
-        renderCurrentChat();
-    }
+    if (currentChatWith === null) renderCurrentChat();
 }
 
-function addPrivateMessage(from, to, text, timestamp) {
-        const room = [from, to].sort().join('_');
-    if (save) {
+function addPrivateMessage(from, to, text, timestamp, skipSave = false) {
+    const room = [from, to].sort().join('_');
+    if (!skipSave) {
         saveMessage(room, from, to, 'text', text, null);
     }
+    
     const other = (from === currentNick) ? to : from;
     if (!privateMessages[other]) privateMessages[other] = [];
     
@@ -208,7 +207,10 @@ function sendPrivateImage(to, base64Data, filename) {
     return true;
 }
 
-function addPublicImage(nick, imageData, filename, timestamp) {
+function addPublicImage(nick, imageData, filename, timestamp, skipSave = false) {
+    if (!skipSave) {
+        saveMessage('public', nick, null, 'image', imageData, filename);
+    }
     publicMessages.push({
         type: 'image',
         nick: nick,
@@ -217,12 +219,15 @@ function addPublicImage(nick, imageData, filename, timestamp) {
         timestamp: timestamp,
         id: msgCounter++
     });
-    if (currentChatWith === null) {
-        renderCurrentChat();
-    }
+    if (currentChatWith === null) renderCurrentChat();
 }
 
-function addPrivateImage(from, to, imageData, filename, timestamp) {
+function addPrivateImage(from, to, imageData, filename, timestamp, skipSave = false) {
+    const room = [from, to].sort().join('_');
+    if (!skipSave) {
+        saveMessage(room, from, to, 'image', imageData, filename);
+    }
+    
     const other = (from === currentNick) ? to : from;
     if (!privateMessages[other]) privateMessages[other] = [];
     
@@ -419,13 +424,20 @@ ws.onopen = () => {
                 currentNick = data.nick;
                 document.getElementById('nickInfo').innerText = currentNick;
             }
-            else if (data.type === 'history') {
+else if (data.type === 'history') {
     data.messages.forEach(msg => {
-        if (msg.room === 'public') {
-            addPublicMessage(msg.from_nick, msg.content, new Date(msg.created_at).getTime(), false);
-        } else if (msg.to_nick === currentNick || msg.from_nick === currentNick) {
-            const other = msg.from_nick === currentNick ? msg.to_nick : msg.from_nick;
-            addPrivateMessage(msg.from_nick, msg.to_nick, msg.content, new Date(msg.created_at).getTime(), false);
+        if (msg.type === 'image') {
+            if (msg.room === 'public') {
+                addPublicImage(msg.from_nick, msg.content, msg.filename, new Date(msg.created_at).getTime(), true);
+            } else {
+                addPrivateImage(msg.from_nick, msg.to_nick, msg.content, msg.filename, new Date(msg.created_at).getTime(), true);
+            }
+        } else {
+            if (msg.room === 'public') {
+                addPublicMessage(msg.from_nick, msg.content, new Date(msg.created_at).getTime(), true);
+            } else {
+                addPrivateMessage(msg.from_nick, msg.to_nick, msg.content, new Date(msg.created_at).getTime(), true);
+            }
         }
     });
 }
@@ -460,12 +472,12 @@ else if (data.type === 'user_list') {
                 document.getElementById('nickInfo').innerText = currentNick;
                 addSystemMessage(`Теперь вы ${currentNick}`);
             }
-            else if (data.type === 'public_image') {
-                addPublicImage(data.nick, data.image, data.filename, data.timestamp);
-            }
-            else if (data.type === 'private_image') {
-                addPrivateImage(data.from, data.to, data.image, data.filename, data.timestamp);
-            }
+else if (data.type === 'public_image') {
+    addPublicImage(data.nick, data.image, data.filename, data.timestamp, false);
+}
+else if (data.type === 'private_image') {
+    addPrivateImage(data.from, data.to, data.image, data.filename, data.timestamp, false);
+}
         } catch(e) {
             console.error(e);
         }
