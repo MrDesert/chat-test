@@ -47,44 +47,47 @@ function renderCurrentChat() {
     const chatDiv = document.getElementById('chat');
     
     // === ОБЩИЙ ЧАТ ===
-    if (currentChatWith === null) {
-        document.getElementById('currentChatTitle').innerHTML = '💬 Общий чат';
-        document.getElementById('closeChatBtn').style.display = 'none';
+if (currentChatWith === null) {
+    document.getElementById('currentChatTitle').innerHTML = '💬 Общий чат';
+    document.getElementById('closeChatBtn').style.display = 'none';
+    
+    if (publicMessages.length === 0) {
+        chatDiv.innerHTML = '<div class="placeholder">💬 Напишите первое сообщение в общий чат</div>';
+        return;
+    }
+    
+    chatDiv.innerHTML = publicMessages.map(msg => {
+        // Используем msg.nick (для новых) или msg.from_nick (из истории)
+        const msgNick = msg.nick || msg.from_nick;
+        // Определяем isOwn по флагу или сравнению
+        const isOwn = msg.isOwn !== undefined ? msg.isOwn : (msgNick === currentNick);
         
-        if (publicMessages.length === 0) {
-            chatDiv.innerHTML = '<div class="placeholder">💬 Напишите первое сообщение в общий чат</div>';
-            return;
-        }
-        
-        chatDiv.innerHTML = publicMessages.map(msg => {
-            const isOwn = (msg.nick === currentNick);
-            
-            if (msg.type === 'image') {
-                return `
-                    <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
-                        <div class="message ${isOwn ? 'own' : 'other'}">
-                            <strong>${escapeHtml(msg.nick)}</strong>:<br>
-                            <div class="image-message">
-                                <img src="${msg.image}" alt="${escapeHtml(msg.filename)}" data-filename="${escapeHtml(msg.filename)}">
-                            </div>
-                        </div>
-                        <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
-                    </div>
-                `;
-            }
-            
+        if (msg.type === 'image') {
             return `
                 <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
                     <div class="message ${isOwn ? 'own' : 'other'}">
-                        <strong>${escapeHtml(msg.nick)}</strong>: ${escapeHtml(msg.text)}
+                        <strong>${escapeHtml(msgNick)}</strong>:<br>
+                        <div class="image-message">
+                            <img src="${msg.image}" alt="${escapeHtml(msg.filename)}" data-filename="${escapeHtml(msg.filename)}">
+                        </div>
                     </div>
                     <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
                 </div>
             `;
-        }).join('');
-        chatDiv.scrollTop = chatDiv.scrollHeight;
-        return;
-    }
+        }
+        
+        return `
+            <div class="message-wrapper ${isOwn ? 'own' : 'other'}">
+                <div class="message ${isOwn ? 'own' : 'other'}">
+                    <strong>${escapeHtml(msgNick)}</strong>: ${escapeHtml(msg.text)}
+                </div>
+                <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+            </div>
+        `;
+    }).join('');
+    chatDiv.scrollTop = chatDiv.scrollHeight;
+    return;
+}
     
     // === ЛИЧНЫЙ ЧАТ ===
     document.getElementById('currentChatTitle').innerHTML = `💬 Чат с ${escapeHtml(currentChatWith)}`;
@@ -125,9 +128,13 @@ function renderCurrentChat() {
     chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-function addPublicMessage(nick, text, timestamp, skipSave = false) {
-    // НЕ СОХРАНЯЕМ ЗДЕСЬ БОЛЬШЕ НИКОГДА
-    publicMessages.push({ nick, text, timestamp, id: msgCounter++ });
+function addPublicMessage(nick, text, timestamp) {
+    const isOwn = (nick.toLowerCase() === currentNick.toLowerCase());
+    publicMessages.push({ 
+        nick, text, timestamp, 
+        id: msgCounter++, 
+        isOwn: isOwn 
+    });
     if (currentChatWith === null) renderCurrentChat();
 }
 
@@ -423,25 +430,43 @@ ws.onopen = () => {
             const data = JSON.parse(event.data);
             
             if (data.type === 'init') {
-                currentNick = data.nick;
+                currentNick = currentUser.nickname;
                 document.getElementById('nickInfo').innerText = currentNick;
             }
 else if (data.type === 'history') {
+       
+    const myNick = currentNick.toLowerCase();
+    
     data.messages.forEach(msg => {
-        if (msg.type === 'image') {
-            if (msg.room === 'public') {
-                addPublicImage(msg.from_nick, msg.content, msg.filename, new Date(msg.created_at).getTime(), true);
-            } else {
-                addPrivateImage(msg.from_nick, msg.to_nick, msg.content, msg.filename, new Date(msg.created_at).getTime(), true);
-            }
-        } else {
-            if (msg.room === 'public') {
-                addPublicMessage(msg.from_nick, msg.content, new Date(msg.created_at).getTime(), true);
-            } else {
-                addPrivateMessage(msg.from_nick, msg.to_nick, msg.content, new Date(msg.created_at).getTime(), true);
-            }
+if (msg.room === 'public') {
+    const isOwn = (msg.from_nick.toLowerCase() === myNick);
+    publicMessages.push({
+        from_nick: msg.from_nick,  // ← добавить
+        nick: msg.from_nick,       // ← добавить для совместимости
+        text: msg.content,
+        timestamp: new Date(msg.created_at).getTime(),
+        id: msgCounter++,
+        isOwn: isOwn
+    });
+} else {
+            const from = msg.from_nick;
+            const to = msg.to_nick;
+            const isOwn = (from.toLowerCase() === myNick);
+            const other = isOwn ? to : from;
+            
+            if (!privateMessages[other]) privateMessages[other] = [];
+            privateMessages[other].push({
+                from: from,
+                to: to,
+                text: msg.content,
+                timestamp: new Date(msg.created_at).getTime(),
+                isOwn: isOwn,
+                id: msgCounter++
+            });
         }
     });
+    
+    renderCurrentChat();
 }
             else if (data.type === 'public') {
                 addPublicMessage(data.nick, data.text, data.timestamp);
@@ -601,7 +626,7 @@ const { data: profile, error: profileError } = await supabase2
         
         document.body.classList.add('authorized');
         authModal.style.display = 'none';
-        connect();
+        // connect();
         return true;
     }
     return false;
@@ -683,8 +708,9 @@ async function checkAuth() {
         document.body.classList.add('authorized');
         authModal.style.display = 'none';
         
-        // Запускаем чат
+        // WebSocket ПОДКЛЮЧАЕМ ТОЛЬКО ПОСЛЕ ТОГО, КАК ЕСТЬ НИК
         connect();
+  
         return true;
     }
     return false;
@@ -707,7 +733,7 @@ function showGuestModal() {
             guestModal.style.display = 'none';
             document.body.classList.add('authorized');
             authModal.style.display = 'none';
-            connect();
+            // connect();
         } else {
             alert("Имя должно быть не короче 2 символов");
         }
@@ -747,10 +773,11 @@ if (guestBtn) {
             email: null,
             nickname: 'Гость-' + Math.floor(Math.random() * 10000)
         };
+        isVerifiedUser = false;
         document.body.classList.add('authorized');
         authModal.style.display = 'none';
-        document.getElementById("nickInput").hidden = false;
-        document.getElementById("changeNickBtn").hidden = false;
+        
+        // WebSocket ПОДКЛЮЧАЕМ СРАЗУ
         connect();
     };
 }
